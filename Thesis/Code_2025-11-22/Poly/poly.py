@@ -66,21 +66,21 @@ class function_poly:
     def f2_third(self, x):
         return self._f2.f_third(x)
 
-    def grad(self, x, gamma):
+    def noisy_grad(self, x, gamma):
         f1_vals = self.f1_prime(x)
         f2_vals = self.f2_prime(x)
         return torch.where(gamma == 0, f1_vals, f2_vals)
     
-    def autograd_vector_batch(self, x):
+    def grad(self, x):
         return self.f_prime(x)
-    def hessian_matrix_batch(self, x):
+    def hessian(self, x):
         return self.f_second(x).unsqueeze(-1)
     def Diag_sigma(self, x):
         return 0.25 * (self.f1_prime(x) - self.f2_prime(x))**2
     def Sigma_sqrt(self, x):
         return torch.sqrt( self.Diag_sigma(x).clamp(min=1e-12) ).unsqueeze(-1)
     def square_root_var_z_squared(self, x):
-        return (1.25 * (self.f1_prime(x) - self.f2_prime(x))**2).unsqueeze(-1)
+        return (0.75 * (self.f1_prime(x) - self.f2_prime(x))**2).unsqueeze(-1)
     def grad_sigma(self, x):
         return ( 0.5 * (self.f1_prime(x) - self.f2_prime(x)) * (self.f1_second(x) - self.f2_second(x)) ).unsqueeze(-1).unsqueeze(-1)
     def grad_sigma_diag(self, x):

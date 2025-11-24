@@ -13,9 +13,9 @@ import torchsde
 import wandb
 import math
 
-
-from Utils import set_seed, norm_and_mean, load_and_preprocess_data, get_regime_functions, save_results
-from Dnn import ShallowNN
+from Algorithms.Utils import get_regime_functions
+from NeuralNetwork.Utils import set_seed, norm_and_mean, load_and_preprocess_data
+from NeuralNetwork.Dnn import ShallowNN
 
 import sys
 sys.setrecursionlimit(10000)
@@ -42,12 +42,12 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=100, help='Number of simulation runs for averaging')
+    train_group.add_argument('--num-runs', type=int, default=512*4, help='Number of simulation runs for averaging')
     train_group.add_argument('--final-time', type=float, default=100.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=100, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=512, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
@@ -570,5 +570,5 @@ if __name__ == "__main__":
 
 
 '''
-python main_v3.py --regime balistic --optimizer RMSProp; python main_v3.py --regime balistic --optimizer Adam; python main_v3.py --regime batch_equivalent --optimizer RMSProp; python main_v3.py --regime batch_equivalent --optimizer Adam;
+python NeuralNetwork.main_v3 --regime balistic --optimizer RMSProp; python NeuralNetwork.main_v3 --regime balistic --optimizer Adam; python NeuralNetwork.main_v3 --regime batch_equivalent --optimizer Adam; python NeuralNetwork.main_v3 --regime batch_equivalent --optimizer RMSProp;
 '''

@@ -22,9 +22,9 @@ class SDE_basic(torchsde.SDEIto):
         self.diffusion = None
         self.drift = None
 
-        self.f_grad = self.fun.autograd_vector_batch(theta)
+        self.f_grad = self.fun.grad(theta)
         assert self.f_grad.dim() == 2, "f_grad should be of shape (batch_size, dim)"
-        self.f_hessian = self.fun.hessian_matrix_batch(theta)
+        self.f_hessian = self.fun.hessian(theta)
         assert self.f_hessian.dim() == 3, "f_hessian should be of shape (batch_size, dim, dim)"
         self.Sigma_sqrt = self.sigma_value*self.fun.Sigma_sqrt(theta)
         assert self.Sigma_sqrt.dim() == 3, "Sigma_sqrt should be of shape (batch_size, dim)"
@@ -59,7 +59,7 @@ class SDE_basic(torchsde.SDEIto):
     def Verbose(self, t):
         if self.verbose and t>self.temp: 
             self.chronometer(t)
-            print(f't: {t:.1f}')
+            print(f't: {t:.1f}', end='\r')
             self.temp += 1 
 
     def divide_input(self, x, t):

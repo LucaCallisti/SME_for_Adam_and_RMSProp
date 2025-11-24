@@ -211,7 +211,7 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
         m = path_m[:, step]
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
-        grad = funz.grad(x, gamma)
+        grad = funz.noisy_grad(x, gamma)
 
         gamma_1 = 1-beta_1**(step+2) * torch.ones_like(v)
         sqrt_gamma_2 = torch.sqrt(torch.tensor(1-beta_2**(step+1) )) * torch.ones_like(v)

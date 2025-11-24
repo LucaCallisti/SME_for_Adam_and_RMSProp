@@ -1,0 +1,149 @@
+
+==================== tau = 0.1, C1 = 1, C2 = 0.5, BETA = (0.9, 0.95), SIGMA = 0.2 ====================
+
+Number of steps: 1000
+[DISCRETE] Starting discrete simulations...
+[DISCRETE] Simulation 1/4...
+[DISCRETE] Simulation 2/4...
+[DISCRETE] Simulation 3/4...
+[DISCRETE] Simulation 4/4...
+[DISCRETE] Simulations completed.
+
+[1ST ORDER SDE] Starting deterministic simulation (1st order)...
+t: 0.2
+t: 1.0
+t: 2.0
+t: 3.0
+t: 4.0
+t: 5.0
+t: 6.0
+t: 7.0
+t: 8.0
+t: 9.0
+t: 10.0
+t: 11.0
+t: 12.0
+t: 13.0
+t: 14.0
+t: 15.0
+t: 16.0
+t: 17.0
+t: 18.0
+t: 19.0
+t: 20.0
+t: 21.0
+t: 22.0
+t: 23.0
+t: 24.0
+t: 25.0
+t: 26.0
+t: 27.0
+t: 28.0
+t: 29.0
+t: 30.0
+t: 31.0
+t: 32.0
+t: 33.0
+t: 34.0
+t: 35.0
+t: 36.0
+t: 37.0
+t: 38.0
+t: 39.0
+t: 40.0
+t: 41.0
+t: 42.0
+t: 43.0
+t: 44.0
+t: 45.0
+t: 46.0
+t: 47.0
+t: 48.0
+t: 49.0
+t: 50.0
+t: 51.0
+t: 52.0
+t: 53.0
+t: 54.0
+t: 55.0
+t: 56.0
+t: 57.0
+t: 58.0
+t: 59.0
+t: 60.0
+t: 61.0
+t: 62.0
+t: 63.0
+t: 64.0
+t: 65.0
+t: 66.0
+t: 67.0
+t: 68.0
+t: 69.0
+t: 70.0
+t: 71.0
+t: 72.0
+t: 73.0
+t: 74.0
+t: 75.0
+t: 76.0
+t: 77.0
+t: 78.0
+t: 79.0
+t: 80.0
+t: 81.0
+t: 82.0
+t: 83.0
+t: 84.0
+t: 85.0
+t: 86.0
+t: 87.0
+t: 88.0
+t: 89.0
+t: 90.0
+t: 91.0
+t: 92.0
+t: 93.0
+t: 94.0
+t: 95.0
+t: 96.0
+t: 97.0
+t: 98.0
+t: 99.0
+time between f 10000 calls 88.48s, time: 99.1828
+[1ST ORDER SDE] Deterministic simulation completed.
+[approx_1_fun] Starting continuous simulations...
+[approx_1_fun] Simulation 1/4...
+t: 0.2
+Traceback (most recent call last):
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 569, in <module>
+    main()
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 560, in main
+    run_experiment_configuration(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 447, in run_experiment_configuration
+    res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 295, in run_1st_order_sde_simulations
+    return _run_1st_order_balistic(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 363, in _run_1st_order_balistic
+    res_1_order_stoc = run_sde_simulations(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 134, in run_sde_simulations
+    res_cont = torchsde.sdeint(sde, y0_batched, ts, method='euler', dt=dt).permute(1, 0, 2)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/sdeint.py", line 110, in sdeint
+    ys, extra_solver_state = solver.integrate(y0, ts, extra_solver_state)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/base_solver.py", line 145, in integrate
+    curr_y, curr_extra = self.step(curr_t, next_t, curr_y, curr_extra)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/methods/euler.py", line 34, in step
+    f, g_prod = self.sde.f_and_g_prod(t0, y0, I_k)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/base_sde.py", line 119, in f_and_g_prod_default2
+    f, g = self.f_and_g(t, y)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/base_sde.py", line 92, in f_and_g_default
+    return self.f(t, y), self.g(t, y)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/Algorithms/Balistic_regime_Adam.py", line 134, in f
+    self.Verbose(t)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/Algorithms/Utils.py", line 60, in Verbose
+    if self.verbose and t>self.temp:
+KeyboardInterrupt

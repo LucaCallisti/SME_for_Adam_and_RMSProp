@@ -1,0 +1,6 @@
+{"time":"2025-11-24T11:27:15.610225538Z","level":"INFO","msg":"stream: starting","core version":"0.22.2"}
+{"time":"2025-11-24T11:27:15.989782271Z","level":"INFO","msg":"stream: created new stream","id":"nao48hk5"}
+{"time":"2025-11-24T11:27:15.99007619Z","level":"INFO","msg":"handler: started","stream_id":"nao48hk5"}
+{"time":"2025-11-24T11:27:15.996158619Z","level":"INFO","msg":"stream: started","id":"nao48hk5"}
+{"time":"2025-11-24T11:27:15.996184189Z","level":"INFO","msg":"writer: started","stream_id":"nao48hk5"}
+{"time":"2025-11-24T11:27:15.996214119Z","level":"INFO","msg":"sender: started","stream_id":"nao48hk5"}

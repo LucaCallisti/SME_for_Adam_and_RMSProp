@@ -109,7 +109,9 @@ class ShallowNN:
         self.loss_batch_cached = batched_loss(theta_batch)
         return self.loss_batch_cached
     
-    def autograd_vector_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
+    def noisy_grad(self, theta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
+        return self.grad(theta) + gamma 
+    def grad(self, theta_batch: torch.Tensor) -> torch.Tensor:
         try:
             import torch.func as F
         except ImportError:
@@ -134,7 +136,7 @@ class ShallowNN:
 
         return self.grad_batch
     
-    def hessian_matrix_batch(self, theta_batch: torch.Tensor = None) -> torch.Tensor:
+    def hessian(self, theta_batch: torch.Tensor = None) -> torch.Tensor:
         try:
             import torch.func as F
         except ImportError:
@@ -167,6 +169,15 @@ class ShallowNN:
         
         self.hessian_batch = hessian_batch
         return hessian_batch
+    
+    def Sigma_sqrt(self, theta):
+        return torch.eye(self.grad_batch.shape[1], device=theta.device).unsqueeze(0).expand(theta.shape[0], -1, -1)
+    
+    def Diag_sigma(self, theta):
+        return torch.ones_like(self.grad_batch)
+
+    def square_root_var_z_squared(self, theta):
+        return (2**0.5 * torch.eye(self.grad_batch.shape[1], device=theta.device)).unsqueeze(0).expand(theta.shape[0], -1, -1)
 
     def term_batch_eq_regime(self):
         result = self.hessian_batch * torch.diag_embed(self.grad_batch) / (self.loss_batch_cached**0.5).view(-1, 1, 1) - torch.einsum('bi,bj->bij', self.grad_batch, self.grad_batch**2) / (4 * self.loss_batch_cached**1.5).view(-1, 1, 1)

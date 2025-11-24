@@ -1,0 +1,38 @@
+
+==================== tau = 0.1, C1 = 1, C2 = 0.5, BETA = (0.9, 0.95), SIGMA = 0.2 ====================
+
+Number of steps: 1000
+[DISCRETE] Starting discrete simulations...
+[DISCRETE] Simulation 1/4...
+[DISCRETE] Simulation 2/4...
+[DISCRETE] Simulation 3/4...
+[DISCRETE] Simulation 4/4...
+[DISCRETE] Simulations completed.
+
+[1ST ORDER SDE] Starting deterministic simulation (1st order)...
+Traceback (most recent call last):
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 569, in <module>
+    main()
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 560, in main
+    run_experiment_configuration(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 447, in run_experiment_configuration
+    res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 295, in run_1st_order_sde_simulations
+    return _run_1st_order_balistic(
+  File "/data/home/callisti/Thesis/Code_2025-11-22/NeuralNetwork/main_v3.py", line 338, in _run_1st_order_balistic
+    res_cont_1 = torchsde.sdeint(sde1, y0.unsqueeze(0), ts, method='euler', dt=tau**2).permute(1, 0, 2)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/sdeint.py", line 93, in sdeint
+    sde, y0, ts, bm, method, options = check_contract(sde, y0, ts, bm, method, adaptive, options, names, logqp)
+  File "/scratch/callisti/Thesis-enc/lib/python3.8/site-packages/torchsde/_core/sdeint.py", line 203, in check_contract
+    f_drift_shape = tuple(sde.f(ts[0], y0).size())
+  File "/data/home/callisti/Thesis/Code_2025-11-22/Algorithms/Balistic_regime_Adam.py", line 171, in f
+    self.divide_input(x, t)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/Algorithms/Balistic_regime_Adam.py", line 125, in divide_input
+    if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
+  File "/data/home/callisti/Thesis/Code_2025-11-22/Algorithms/Utils.py", line 31, in update_quantities
+    self.diag_Sigma = self.sigma_value**2 * self.fun.Diag_sigma(theta)
+AttributeError: 'ShallowNN' object has no attribute 'Diag_sigma'

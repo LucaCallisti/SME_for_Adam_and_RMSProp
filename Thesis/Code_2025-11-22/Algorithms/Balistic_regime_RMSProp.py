@@ -192,7 +192,7 @@ def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, sk
         
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
-        grad = funz.grad(x, gamma)
+        grad = funz.noisy_grad(x, gamma)
         path_v[:, step+1] = (1 - c * lr) * v + c * lr * grad**2
         path_x[:, step+1] = x - lr * grad / (torch.sqrt(path_v[:, step]) + epsilon)
     if loss_bool:
