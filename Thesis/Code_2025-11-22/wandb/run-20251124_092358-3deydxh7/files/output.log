@@ -1,0 +1,34 @@
+> c:\users\lucac\desktop\codice\sme_for_adam_and_rmsprop\thesis\code_2025-11-22\poly\main.py(468)run_experiment_configuration()
+-> breakpoint()
+*** TypeError: unsupported operand type(s) for -: 'numpy.ndarray' and 'Tensor'
+*** TypeError: unsupported operand type(s) for -: 'numpy.ndarray' and 'Tensor'
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+dict_keys(['disc', 'final_time', 'tau', 'c', 'epsilon', 'regime', 'optimizer', 'total_time_elapsed', 'skipped_initial_points', 'initial_points_before_disc', 'initial_points_after_disc', 'simulation keys', '1_order_stoc', '2_order_stoc', '1_order_det'])
+['disc', '1_order_stoc', '2_order_stoc', '1_order_det']
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+array([0.61802197], dtype=float32)
+array([0.5831111 , 0.19846761, 1.0097405 ], dtype=float32)
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 502, in <module>
+    if final_distribution_1st is not None:
+    ^^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 493, in main
+    ax.set_xlabel('x')
+        ^^^^^^^^^^^^^^
+    ax.set_ylabel('f(x)')
+    ^^^^^^^^^^^^^^^^^^^^^
+    ax.set_title(f'Funzioni e punti iniziali (tau={tau})')
+    ^^^^^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 468, in run_experiment_configuration
+    breakpoint()
+    ~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 116, in trace_dispatch
+    return self.dispatch_opcode(frame, arg)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 216, in dispatch_opcode
+    if self.quitting: raise BdbQuit
+                      ^^^^^^^^^^^^^
+bdb.BdbQuit

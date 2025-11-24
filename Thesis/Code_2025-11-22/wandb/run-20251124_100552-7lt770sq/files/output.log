@@ -1,0 +1,26 @@
+> c:\users\lucac\desktop\codice\sme_for_adam_and_rmsprop\thesis\code_2025-11-22\poly\main.py(541)run_experiment_configuration()
+-> breakpoint()
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 569, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 560, in main
+    run_experiment_configuration(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        args, tau, args.points
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 541, in run_experiment_configuration
+    breakpoint()
+    ~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 116, in trace_dispatch
+    return self.dispatch_opcode(frame, arg)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 216, in dispatch_opcode
+    if self.quitting: raise BdbQuit
+                      ^^^^^^^^^^^^^
+bdb.BdbQuit

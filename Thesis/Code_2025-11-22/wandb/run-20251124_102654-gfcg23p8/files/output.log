@@ -1,0 +1,19 @@
+> c:\users\lucac\desktop\codice\sme_for_adam_and_rmsprop\thesis\code_2025-11-22\poly\main.py(511)run_experiment_configuration()
+-> breakpoint()
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 601, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 592, in main
+    run_experiment_configuration(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        args, tau, args.points
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 557, in run_experiment_configuration
+    ax_hist.set_ylim(f_min - 0.05 * func_range, f_min + func_range * 1.05)
+                     ^^^^^
+NameError: name 'f_min' is not defined

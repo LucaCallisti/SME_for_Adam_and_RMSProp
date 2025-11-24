@@ -1,0 +1,8 @@
+> c:\users\lucac\desktop\codice\sme_for_adam_and_rmsprop\thesis\code_2025-11-22\poly\main.py(478)run_experiment_configuration()
+-> breakpoint()
+array([0.61802197], dtype=float32)
+array([0.5893297 , 0.16750728, 0.9782266 ], dtype=float32)
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+[tau=0.1] Execution time: 2.27 seconds
+
+All experiments completed successfully!

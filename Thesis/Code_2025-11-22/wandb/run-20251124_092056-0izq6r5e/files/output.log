@@ -1,0 +1,22 @@
+> c:\users\lucac\desktop\codice\sme_for_adam_and_rmsprop\thesis\code_2025-11-22\poly\main.py(466)run_experiment_configuration()
+-> breakpoint()
+dict_keys(['theta_mean', 'v_mean', 'final_distribution', 'time_steps', 'time_elapsed', 'n_runs'])
+*** NameError: name 'final_result' is not defined
+dict_keys(['disc', 'final_time', 'tau', 'c', 'epsilon', 'regime', 'optimizer', 'total_time_elapsed', 'skipped_initial_points', 'simulation keys', '1_order_stoc', '2_order_stoc', '1_order_det'])
+*** WARNING: file 'C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py' was edited, running stale code until the program is rerun
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 498, in <module>
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 489, in main
+
+
+    # Run experiments for all parameter combinations
+  File "C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\Poly\main.py", line 466, in run_experiment_configuration
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 116, in trace_dispatch
+    return self.dispatch_opcode(frame, arg)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.2544.0_x64__qbz5n2kfra8p0\Lib\bdb.py", line 216, in dispatch_opcode
+    if self.quitting: raise BdbQuit
+                      ^^^^^^^^^^^^^
+bdb.BdbQuit

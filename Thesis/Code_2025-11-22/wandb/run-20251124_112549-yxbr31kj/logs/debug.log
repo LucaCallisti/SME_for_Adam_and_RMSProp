@@ -1,0 +1,26 @@
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_setup.py:_flush():80] Current SDK version is 0.23.0
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_setup.py:_flush():80] Configure stats pid to 43736
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_setup.py:_flush():80] Loading settings from C:\Users\lucac\.config\wandb\settings
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_setup.py:_flush():80] Loading settings from C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\wandb\settings
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_setup.py:_flush():80] Loading settings from environment variables
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_init.py:setup_run_log_directory():713] Logging user logs to C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\wandb\run-20251124_112549-yxbr31kj\logs\debug.log
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_init.py:setup_run_log_directory():714] Logging internal logs to C:\Users\lucac\Desktop\Codice\SME_for_Adam_and_RMSProp\Thesis\Code_2025-11-22\wandb\run-20251124_112549-yxbr31kj\logs\debug-internal.log
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_init.py:init():840] calling init triggers
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_init.py:init():845] wandb.init called with sweep_config: {}
+config: {'points': [-1.0, 1.0, 0.25, 2], 'tau_list': [0.05], 'c': 0.5, 'c_1': 1, 'c_2': 0.5, 'sigma_list': [0.2], 'num_runs': 1024, 'final_time': 10.0, 'epsilon': 0.1, 'skip_initial_point': 2, 'device': 'cpu', 'batch_size': 1024, 'regime': 'balistic', 'simulations': ['1st_order_sde', '2nd_order_sde'], 'optimizer': 'RMSProp', 'seed_disc': 100, 'seed_1st': 150, 'seed_2nd': 200, 'seed_parameters': 50, 'seed_noise': 25, 'results_dir': 'results', 'verbose': True, 'wandb': True, '_wandb': {}}
+2025-11-24 11:25:49,628 INFO    MainThread:43736 [wandb_init.py:init():888] starting backend
+2025-11-24 11:25:51,883 INFO    MainThread:43736 [wandb_init.py:init():891] sending inform_init request
+2025-11-24 11:25:51,903 INFO    MainThread:43736 [wandb_init.py:init():899] backend started and connected
+2025-11-24 11:25:51,913 INFO    MainThread:43736 [wandb_init.py:init():969] updated telemetry
+2025-11-24 11:25:51,940 INFO    MainThread:43736 [wandb_init.py:init():993] communicating run to backend with 90.0 second timeout
+2025-11-24 11:25:52,544 INFO    MainThread:43736 [wandb_init.py:init():1040] starting run threads in backend
+2025-11-24 11:25:52,581 INFO    MainThread:43736 [wandb_run.py:_console_start():2504] atexit reg
+2025-11-24 11:25:52,582 INFO    MainThread:43736 [wandb_run.py:_redirect():2352] redirect: wrap_raw
+2025-11-24 11:25:52,582 INFO    MainThread:43736 [wandb_run.py:_redirect():2421] Wrapping output streams.
+2025-11-24 11:25:52,582 INFO    MainThread:43736 [wandb_run.py:_redirect():2444] Redirects installed.
+2025-11-24 11:25:52,583 INFO    MainThread:43736 [wandb_init.py:init():1080] run started, returning control to user process
+2025-11-24 11:26:11,276 INFO    MainThread:43736 [wandb_run.py:_finish():2270] finishing run luca-callisti-/Poly/yxbr31kj
+2025-11-24 11:26:11,276 INFO    MainThread:43736 [wandb_run.py:_atexit_cleanup():2469] got exitcode: 0
+2025-11-24 11:26:11,277 INFO    MainThread:43736 [wandb_run.py:_restore():2451] restore
+2025-11-24 11:26:11,277 INFO    MainThread:43736 [wandb_run.py:_restore():2457] restore done
+2025-11-24 11:26:12,222 INFO    MainThread:43736 [wandb_run.py:_footer_sync_info():3853] logging synced files
