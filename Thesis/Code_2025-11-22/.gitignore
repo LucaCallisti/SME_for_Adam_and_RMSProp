@@ -1,0 +1,12 @@
+# Ignora file PyTorch
+*.pt
+*.pth
+
+# Ignora cartelle di risultati
+results/
+output/
+wandb/
+
+# Ignora file temporanei di Python
+__pycache__/
+*.pyc

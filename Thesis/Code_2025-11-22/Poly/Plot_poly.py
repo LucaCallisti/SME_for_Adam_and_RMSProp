@@ -30,6 +30,8 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
     dist_1st = final_results['1_order_stoc']['final_distribution'].cpu().numpy().flatten() if '1_order_stoc' in final_results else None
     dist_2nd = final_results['2_order_stoc']['final_distribution'].cpu().numpy().flatten() if '2_order_stoc' in final_results else None
 
+    print(f'mean of distribution disc: {dist_disc.mean()},1st order: {dist_1st.mean() if dist_1st is not None else "N/A"}, 2nd order: {dist_2nd.mean() if dist_2nd is not None else "N/A"}')
+
     # --- Plot ---
     fig, ax1 = plt.subplots(figsize=(10,6))
 
@@ -61,7 +63,6 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
     ax2.set_ylabel('Probability density')
     ax2.legend(loc='upper right')
 
-    plt.title('Funzioni, punti iniziali e distribuzioni finali')
     fig_path = os.path.join(result_dir, f'final_plot_tau_{tau}.png')
     print(f'Saving final plot to {fig_path}')
     fig.savefig(fig_path)

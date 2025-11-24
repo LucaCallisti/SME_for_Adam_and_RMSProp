@@ -14,7 +14,7 @@ import wandb
 import math
 
 
-from Poly.Utils import set_seed, norm_and_mean
+from Poly.Utils import set_seed, processing_outputs
 from Poly.poly import function_poly 
 from Algorithms.Utils import get_regime_functions
 from Poly.Plot_poly import plot_poly_result
@@ -34,14 +34,15 @@ def parse_arguments() -> argparse.Namespace:
 
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
-    train_group.add_argument('--initial_points', type=float, default=[1.5, 1.15, 0.85, 0.5, 0.1, 0.0, -0.1], help='Initial points for optimization')
-    train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.001], help='Learning rate values to test')
+    # 1.5, 1.15, 0.85, 0.5, 0.1, 0.0, -0.1,
+    train_group.add_argument('--initial_points', type=float, default=[1.5, 1.15, 0.85, 0.5, 0.3, 0.1, 0.0, -0.1, -0.1, -0.3, -0.5], help='Initial points for optimization')
+    train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.01], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
     train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=10.0, help='Final time for SDE integration')
+    train_group.add_argument('--final-time', type=float, default=15.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
@@ -126,12 +127,12 @@ def run_sde_simulations(
     # Aggregate results
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
     if optimizer == 'Adam':
-        theta, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        m, _ = norm_and_mean(runs[:, :, dim_weights: 2*dim_weights])
-        v, _ = norm_and_mean(runs[:, :, 2*dim_weights:])
+        theta, final_distribution = processing_outputs(runs[:, :, :dim_weights])
+        m, _ = processing_outputs(runs[:, :, dim_weights: 2*dim_weights])
+        v, _ = processing_outputs(runs[:, :, 2*dim_weights:])
     elif optimizer == 'RMSProp':
-        theta, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        v, _ = norm_and_mean(runs[:, :, dim_weights:])
+        theta, final_distribution = processing_outputs(runs[:, :, :dim_weights])
+        v, _ = processing_outputs(runs[:, :, dim_weights:])
     t1 = time.time()
 
     res = {
@@ -202,12 +203,12 @@ def run_discrete_simulations(
     # Aggregate results
     discrete_runs = discrete_runs.reshape(-1, discrete_runs.shape[2], discrete_runs.shape[3])
     if optimizer == 'Adam':
-        theta_mean_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        m_mean_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights: 2*dim_weights])
-        v_mean_disc, _ = norm_and_mean(discrete_runs[:, :, 2*dim_weights:])
+        theta_mean_disc, final_distribution_disc = processing_outputs(discrete_runs[:, :, :dim_weights])
+        m_mean_disc, _ = processing_outputs(discrete_runs[:, :, dim_weights: 2*dim_weights])
+        v_mean_disc, _ = processing_outputs(discrete_runs[:, :, 2*dim_weights:])
     elif optimizer == 'RMSProp':
-        theta_mean_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        v_mean_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights:])
+        theta_mean_disc, final_distribution_disc = processing_outputs(discrete_runs[:, :, :dim_weights])
+        v_mean_disc, _ = processing_outputs(discrete_runs[:, :, dim_weights:])
     t1 = time.time()
 
     result_disc = {
@@ -296,8 +297,8 @@ def _run_1st_order_balistic(
     res_cont_1 = torchsde.sdeint(sde1, initial_points.unsqueeze(0).expand(batch_size, -1), ts, method='euler', dt=tau**2).permute(1, 0, 2)
     
     # Compute losses for deterministic with batch processing
-    theta_1_order, final_distribution_1_order_det = norm_and_mean(res_cont_1[:, :, :dim_weights])
-    v_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:])
+    theta_1_order, final_distribution_1_order_det = processing_outputs(res_cont_1[:, :, :dim_weights])
+    v_1_order, _ = processing_outputs(res_cont_1[:, :, dim_weights:])
     t1 = time.time()
 
     res_1_order_det = {
@@ -436,7 +437,7 @@ def run_experiment_configuration(
     if args.wandb:
         wandb.init(
             project='Poly',
-            name=f'{args.optimizer}_{initial_points}_tau_{tau}_c_{args.c}',
+            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_tau{tau}_c{args.c}_time{args.final_time}',
             config=vars(args),
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
@@ -457,6 +458,14 @@ def run_experiment_configuration(
                     f"v_{sim}": v_val,
                     "time": ts[t]
                 })
+
+            final_distribution = final_results[sim]['final_distribution'].cpu().numpy().flatten()
+            positive = (final_distribution >= 0).sum()
+            negative = (final_distribution < 0).sum()
+            wandb.log({
+                f"final_theta_positive_fraction_{sim}": positive / final_distribution.shape[0],
+                f"final_theta_negative_fraction_{sim}": negative / final_distribution.shape[0]
+            })
       
 
             # Log final distributions as histograms to wandb
@@ -468,6 +477,11 @@ def run_experiment_configuration(
             })
 
         plot_poly_result(final_results, poly, tau, result_dir, args)
+        if final_results['disc']['final_distribution'].mean() > 0:
+            plot_poly_result(final_results, poly, tau, result_dir, args, xlim = (0.5, 1.5))
+        else:
+            plot_poly_result(final_results, poly, tau, result_dir, args, xlim = (-1.5, -0.5))
+
         wandb.finish()
 
     print(f"[tau={tau}] Execution time: {t1-t0:.2f} seconds\n")
@@ -500,5 +514,5 @@ if __name__ == "__main__":
     main()
 
 """
-python -m Poly.main --regime balistic --optimizer RMSProp; python -m Poly.main --regime balistic --optimizer Adam; python -m Poly.main --regime batch_equivalent --optimizer RMSProp; python -m Poly.main --regime batch_equivalent --optimizer Adam;
+python -m Poly.main --regime balistic --optimizer RMSProp; python -m Poly.main --regime balistic --optimizer Adam; python -m Poly.main --regime batch_equivalent --optimizer Adam; python -m Poly.main --regime batch_equivalent --optimizer RMSProp;
 """

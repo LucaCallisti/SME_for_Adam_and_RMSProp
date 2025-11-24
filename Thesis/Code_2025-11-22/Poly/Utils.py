@@ -23,17 +23,7 @@ def set_seed(seed: int) -> None:
         pass
 
 
-def norm_and_mean(tensor: torch.Tensor) -> torch.Tensor:
-    """
-    Normalize tensor and compute mean across batches.
-    
-    Args:
-        tensor: Input tensor of shape (num_batch, num_steps, num_params)
-        
-    Returns:
-        Mean norm across batches
-    """
-    norm = torch.norm(tensor, dim=2, keepdim=True)
-    mean = torch.mean(norm, dim=0)
-    final_norm = norm[:, -1, :]
-    return mean, final_norm
+def processing_outputs(tensor: torch.Tensor) -> torch.Tensor:
+    mean = tensor.mean(dim=0)
+    final_distribution = tensor[:, -1, :]
+    return mean, final_distribution
