@@ -343,7 +343,9 @@ def _run_1st_order_balistic(
     val_loss_1_order = model.val_loss_batch(theta_batch)
     final_loss_distribution = loss_1_order[-1]
     theta_1_order, final_distribution_1_order_det = norm_and_mean(res_cont_1[:, :, :dim_weights])
-    v_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:])
+    v_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:2*dim_weights])
+    if optimizer == 'Adam':
+        m_1_order, _ = norm_and_mean(res_cont_1[:, :, 2*dim_weights:])
     t1 = time.time()
 
     res_1_order_det = {
@@ -357,6 +359,8 @@ def _run_1st_order_balistic(
         'time_elapsed': t1 - t0,
         'n_runs': 1
     }
+    if optimizer == 'Adam':
+        res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
 
     # Stochastic simulations

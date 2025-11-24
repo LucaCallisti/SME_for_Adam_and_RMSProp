@@ -37,7 +37,7 @@ class SDE_basic(torchsde.SDEIto):
         if self.eq == 'RMSProp' and self.regime == 'batch_equivalent':
             self.term_b_1_theta_RMSProp_BatchEq = self.sigma_value**2 * self.fun.term_b1_RMSProp_BatchEq(theta)
             # To do da fare assert
-
+            
         if self.constant_noise is False:
             self.grad_Sigma = self.sigma_value**2 * self.fun.grad_sigma(theta)
             assert self.grad_Sigma.dim() == 4, "grad_Sigma should be of shape (batch_size, dim, dim, dim)"  # where the first dim is for the derivative

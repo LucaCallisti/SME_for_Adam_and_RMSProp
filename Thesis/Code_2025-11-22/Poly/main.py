@@ -7,6 +7,7 @@ import argparse
 import os
 import time
 from typing import Dict, Tuple, Optional, Any
+import sys
 
 import torch
 import torchsde
@@ -20,6 +21,7 @@ from Algorithms.Utils import get_regime_functions
 from Poly.Plot_poly import plot_poly_result
 
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+sys.setrecursionlimit(10000)
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments with comprehensive parameter configuration."""
@@ -35,7 +37,7 @@ def parse_arguments() -> argparse.Namespace:
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
     # 1.5, 1.15, 0.85, 0.5, 0.1, 0.0, -0.1,
-    train_group.add_argument('--initial_points', type=float, default=[1.5, 1.15, 0.85, 0.5, 0.3, 0.1, 0.0, -0.1, -0.1, -0.3, -0.5], help='Initial points for optimization')
+    train_group.add_argument('--initial_points', type=float, default=[1.5, 1.15, 0.85, 0.5, 0.3, 0.1, 0.0, -0.1, -0.3, -0.5], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.01], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
@@ -298,7 +300,9 @@ def _run_1st_order_balistic(
     
     # Compute losses for deterministic with batch processing
     theta_1_order, final_distribution_1_order_det = processing_outputs(res_cont_1[:, :, :dim_weights])
-    v_1_order, _ = processing_outputs(res_cont_1[:, :, dim_weights:])
+    v_1_order, _ = processing_outputs(res_cont_1[:, :, dim_weights: 2*dim_weights])
+    if optimizer == 'Adam':
+        m_1_order, _ = processing_outputs(res_cont_1[:, :, 2*dim_weights:])
     t1 = time.time()
 
     res_1_order_det = {
@@ -309,6 +313,8 @@ def _run_1st_order_balistic(
         'time_elapsed': t1 - t0,
         'n_runs': 1
     }
+    if optimizer == 'Adam':
+        res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
 
     # Stochastic simulations
