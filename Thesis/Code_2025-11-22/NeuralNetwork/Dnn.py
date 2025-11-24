@@ -109,8 +109,10 @@ class ShallowNN:
         self.loss_batch_cached = batched_loss(theta_batch)
         return self.loss_batch_cached
     
-    def noisy_grad(self, theta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
+    def noisy_grad_balistic(self, theta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
         return self.grad(theta) + gamma 
+    def noisy_grad_batcheq(self, theta: torch.Tensor, gamma: torch.Tensor, tau: float) -> torch.Tensor:
+        return self.grad(theta) + gamma / tau**0.5
     def grad(self, theta_batch: torch.Tensor) -> torch.Tensor:
         try:
             import torch.func as F

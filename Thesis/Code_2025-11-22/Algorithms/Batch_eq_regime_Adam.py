@@ -94,7 +94,7 @@ class Adam_SDE_2order_batch_equivalent_regime(SDE_basic):
         second_term = 0.5 * self.c_2**2 * (self.diag_Sigma - self.v)
         if self.constant_noise is False:
            temp1 = self.m * denom
-           third_term = 0.5 *self.c_1 * self.c_2 *self.Gamma(t) * torch.bmm(self.grad_Sigma_diag, temp1)
+           third_term = 0.5 *self.c_1 * self.c_2 *self.Gamma(t) * torch.bmm(self.grad_Sigma_diag, temp1.unsqueeze(2)).squeeze(2)
         else:
             third_term = 0
         return  (first_term + second_term + third_term)
@@ -194,6 +194,8 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
     max_lenghth_gamma_list = 1000
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
 
+    print('Starting point:', path_x[:,0,:].mean().item())
+
     for step in range(num_steps-1):
 
         if step % max_lenghth_gamma_list == 0:            
@@ -212,20 +214,18 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
         m = path_m[:, step]
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
-        grad = funz.noisy_grad(x, gamma)
+        g = funz.noisy_grad_batcheq(x, gamma, lr)
 
         gamma_1 = 1-beta_1**(step+2) * torch.ones_like(v)
         sqrt_gamma_2 = torch.sqrt(torch.tensor(1-beta_2**(step+1) )) * torch.ones_like(v)
 
-        g = grad + gamma / lr**0.5
         path_v[:, step+1] = beta_2 * v + lr**2 * c_2 * torch.pow(g, 2)
         path_m[:, step+1] = beta_1 * m + lr * c_1 * g
 
         path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
         if verbose and step*lr >= temp:
-            temp += 1
-            print(f'Step {step}, v: {path_v[step]}, theta: {path_x[step]}')
-    
+            temp += 0.1
+        
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
         return torch.concat((path_x, path_m, path_v), dim = 2), Loss_values

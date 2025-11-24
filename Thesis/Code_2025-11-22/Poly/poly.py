@@ -49,6 +49,8 @@ class function_poly:
         return self._f.f_prime(x)
     def f_second(self, x):
         return self._f.f_second(x)
+    def f_third(self, x):
+        return self._f.f_third(x)
     def f1(self, x):
         return self._f1.f(x)
     def f1_prime(self, x):
@@ -66,10 +68,15 @@ class function_poly:
     def f2_third(self, x):
         return self._f2.f_third(x)
 
-    def noisy_grad(self, x, gamma):
+    def noisy_grad_balistic(self, x, gamma):
         f1_vals = self.f1_prime(x)
         f2_vals = self.f2_prime(x)
         return torch.where(gamma == 0, f1_vals, f2_vals)
+    def noisy_grad_batcheq(self, x, gamma, tau):
+        grad = self.grad(x)
+        noise = self.noisy_grad_balistic(x, gamma) - grad
+        return grad + noise / tau**0.5
+
     
     def grad(self, x):
         return self.f_prime(x)

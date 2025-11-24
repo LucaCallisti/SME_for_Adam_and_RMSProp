@@ -52,9 +52,9 @@ def parse_arguments() -> argparse.Namespace:
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
-    regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
+    regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='batch_equivalent', help='Optimization regime to use')
     regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
-    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='RMSProp', help='Optimizer to use for discrete simulations')
+    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
     seed_group = parser.add_argument_group('Random Seeds')

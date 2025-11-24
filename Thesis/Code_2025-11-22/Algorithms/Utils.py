@@ -18,6 +18,8 @@ class SDE_basic(torchsde.SDEIto):
         super().__init__(noise_type=noise_type)
         self.eq = None
         self.constant_noise = None
+        self.last_neg_value = 0
+        
     def update_quantities(self, theta, t):
         self.diffusion = None
         self.drift = None
@@ -37,7 +39,7 @@ class SDE_basic(torchsde.SDEIto):
         if self.eq == 'RMSProp' and self.regime == 'batch_equivalent':
             self.term_b_1_theta_RMSProp_BatchEq = self.sigma_value**2 * self.fun.term_b1_RMSProp_BatchEq(theta)
             # To do da fare assert
-            
+
         if self.constant_noise is False:
             self.grad_Sigma = self.sigma_value**2 * self.fun.grad_sigma(theta)
             assert self.grad_Sigma.dim() == 4, "grad_Sigma should be of shape (batch_size, dim, dim, dim)"  # where the first dim is for the derivative
@@ -67,13 +69,17 @@ class SDE_basic(torchsde.SDEIto):
         if self.eq == 'RMSProp':
             aux = x.shape[1] // 2 
             theta, self.v = x[:, :aux], x[:, aux:2*aux]
-            if (self.v<0).sum() > 0 and self.verbose: print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
+            if (self.v<0).sum() > 0 and self.verbose and t > self.last_neg_value + 1: 
+                print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
+                self.last_neg_value = t
             if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
             self.theta = theta
         elif self.eq == 'Adam':
             aux = x.shape[1] // 3
             theta, self.m, self.v = x[:, :aux], x[:, aux:2*aux], x[:, 2*aux:]
-            if (self.v<0).sum() > 0 and self.verbose: print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
+            if (self.v<0).sum() > 0 and self.verbose and t > self.last_neg_value + 1: 
+                print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
+                self.last_neg_value = t
             if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
             self.theta = theta
         else:
