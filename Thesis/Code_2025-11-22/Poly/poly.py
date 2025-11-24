@@ -87,3 +87,5 @@ class function_poly:
         return ( 0.5 * (self.f1_prime(x) - self.f2_prime(x)) * (self.f1_second(x) - self.f2_second(x)) ).unsqueeze(-1)
     def hessian_sigma(self, x):
         return ( 0.5 * (self.f1_second(x) - self.f2_second(x))**2 + 0.5 * (self.f1_prime(x) - self.f2_prime(x)) * (self.f1_third(x) - self.f2_third(x)) ).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+    def term_b1_RMSProp_BatchEq(self, x):
+        return (self.Diag_sigma(x) * self.f_third(x)).unsqueeze(-1).unsqueeze(-1)

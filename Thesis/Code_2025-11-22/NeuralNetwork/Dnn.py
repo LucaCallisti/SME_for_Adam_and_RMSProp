@@ -179,7 +179,7 @@ class ShallowNN:
     def square_root_var_z_squared(self, theta):
         return (2**0.5 * torch.eye(self.grad_batch.shape[1], device=theta.device)).unsqueeze(0).expand(theta.shape[0], -1, -1)
 
-    def term_batch_eq_regime(self):
+    def term_b1_RMSProp_BatchEq(self, theta):
         result = self.hessian_batch * torch.diag_embed(self.grad_batch) / (self.loss_batch_cached**0.5).view(-1, 1, 1) - torch.einsum('bi,bj->bij', self.grad_batch, self.grad_batch**2) / (4 * self.loss_batch_cached**1.5).view(-1, 1, 1)
         result[:, :, -1] = torch.zeros_like(result[:, :, -1])  
         return result

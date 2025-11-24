@@ -8,6 +8,7 @@ torch.set_printoptions(precision=6)
 class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
     def __init__(self, tau, c, function, All_time, regularizer, epsilon = 1e-6, sigma_value = 0.5, constant_noise = True, Verbose = True):
         super().__init__(noise_type="general")
+        self.regime = 'batch_equivalent'
         self.eq = 'RMSProp'
         self.constant_noise = constant_noise
         

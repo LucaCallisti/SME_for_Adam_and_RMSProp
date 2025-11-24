@@ -34,8 +34,9 @@ class SDE_basic(torchsde.SDEIto):
         assert self.square_root_var_z_squared.dim() == 3, "square_root_var_z_squared should be of shape (batch_size, dim, dim)"
         self.f_grad_square = torch.pow(self.f_grad, 2)   
 
-        if self.eq == 'RMSProp':
-            self.term_b_1_theta_RMSProp = torch.zeros_like(self.Sigma_sqrt)    #  To do
+        if self.eq == 'RMSProp' and self.regime == 'batch_equivalent':
+            self.term_b_1_theta_RMSProp_BatchEq = self.sigma_value**2 * self.fun.term_b1_RMSProp_BatchEq(theta)
+            # To do da fare assert
 
         if self.constant_noise is False:
             self.grad_Sigma = self.sigma_value**2 * self.fun.grad_sigma(theta)

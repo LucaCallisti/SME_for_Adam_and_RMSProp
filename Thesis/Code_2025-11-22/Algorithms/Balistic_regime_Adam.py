@@ -8,6 +8,7 @@ torch.set_printoptions(precision=6)
 class Adam_SDE_2order_balistic_regime(SDE_basic):
     def __init__(self, eta, c, function, All_time, regularizer, epsilon = 1e-6, sigma_value=0.5, constant_noise = True, Verbose = True):
         super().__init__(noise_type="general")
+        self.regime = 'balistic'
         self.eq = 'Adam'
         if constant_noise is False:
             print("constant_noise must be True in balistic regime. Setting it to True.")

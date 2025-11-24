@@ -12,6 +12,7 @@ torch.set_printoptions(precision=6)
 class RMSprop_SDE_2order_balistic_regime(SDE_basic):
     def __init__(self, tau, c, function, All_time, regularizer, epsilon = 1e-6, sigma_value = 1.0, constant_noise = True, Verbose = False):
         super().__init__(noise_type="general")
+        self.regime = 'balistic'
         self.eq = 'RMSProp'
         if constant_noise is False:
             print("constant_noise must be True in balistic regime. Setting it to True.")
