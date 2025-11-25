@@ -349,10 +349,10 @@ def run_experiment_configuration(
     if args.optimizer == 'Adam':
         args.c = (args.c_1, args.c_2)
         beta = (1 - tau * args.c_1, 1 - tau * args.c_2)
-        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta} ====================\n")
+        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta} Starting point {initial_points_before_disc} ====================\n")
     elif args.optimizer == 'RMSProp':
         beta = 1 - tau * args.c
-        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} ====================\n")
+        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} Starting point {initial_points_before_disc} ====================\n")
 
     # Create result directory
     result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{args.final_time}"

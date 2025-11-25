@@ -42,7 +42,7 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=512*4, help='Number of simulation runs for averaging')
+    train_group.add_argument('--num-runs', type=int, default=512, help='Number of simulation runs for averaging')
     train_group.add_argument('--final-time', type=float, default=100.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
@@ -388,11 +388,7 @@ def run_experiment_configuration(
     Returns:
         Tuple of (max_err_1st, max_err_2nd)
     """
-    wandb.init(
-        project='test',
-        name = 'test'
-        )
-    
+
     # Setup experiment
     if args.regime == 'balistic':
         regime_name = 'Balistic'
