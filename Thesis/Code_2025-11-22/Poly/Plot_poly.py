@@ -4,7 +4,7 @@ import os
 import torch
 import wandb
 
-def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
+def plot_poly_result(final_results, poly, result_dir, wandb_bool = True, xlim = None):
     initial_before = final_results['initial_points_before_disc'].cpu().numpy()
     initial_after = final_results['initial_points_after_disc'][0].cpu().numpy()
 
@@ -30,8 +30,8 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
     dist_1st = final_results['1_order_stoc']['final_distribution'].cpu().numpy().flatten() if '1_order_stoc' in final_results else None
     dist_2nd = final_results['2_order_stoc']['final_distribution'].cpu().numpy().flatten() if '2_order_stoc' in final_results else None
 
-    print(f'mean of distribution disc: {dist_disc.mean()},1st order: {dist_1st.mean() if dist_1st is not None else "N/A"}, 2nd order: {dist_2nd.mean() if dist_2nd is not None else "N/A"}')
-
+    print(f'mean/min/max of distribution disc: {dist_disc.mean(), dist_disc.min(), dist_disc.max()},1st order: {(dist_1st.mean(), dist_1st.min(), dist_1st.max()) if dist_1st is not None else "N/A"}, 2nd order: {(dist_2nd.mean(), dist_2nd.min(), dist_2nd.max()) if dist_2nd is not None else "N/A"}')
+    breakpoint()
     # --- Plot ---
     fig, ax1 = plt.subplots(figsize=(10,6))
 
@@ -63,9 +63,10 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
     ax2.set_ylabel('Probability density')
     ax2.legend(loc='upper right')
 
-    fig_path = os.path.join(result_dir, f'final_plot_tau_{tau}.png')
+    fig_path = os.path.join(result_dir, f'final_plot.png')
     print(f'Saving final plot to {fig_path}')
     fig.savefig(fig_path)
-    if args.wandb:
+    if wandb_bool:
         wandb.log({"final_plot": wandb.Image(fig_path)})
     plt.close(fig)
+

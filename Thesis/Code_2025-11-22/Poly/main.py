@@ -36,19 +36,18 @@ def parse_arguments() -> argparse.Namespace:
 
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
-    # 1.5, 1.15, 0.85, 0.5, 0.1, 0.0, -0.1,
-    train_group.add_argument('--initial_points', type=float, default=[1.5, 1.15, 0.85, 0.5, 0.3, 0.1, 0.0, -0.1, -0.3, -0.5], help='Initial points for optimization')
+    # 1.5, 1.15, 0.85, 0.5, 0.1, 0.0, -0.1, -0.3, -0.5
+    train_group.add_argument('--initial_points', type=float, default=[-0.1], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.01], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
-    train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=15.0, help='Final time for SDE integration')
+    train_group.add_argument('--num-runs', type=int, default=128, help='Number of simulation runs for averaging')
+    train_group.add_argument('--final-time', type=float, default=5.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=1024, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=128, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
@@ -124,7 +123,6 @@ def run_sde_simulations(
 
         res_cont = torchsde.sdeint(sde, initial_points.unsqueeze(0).expand(batch_size, -1).to(device), ts, method='euler', dt=dt).permute(1, 0, 2)
         runs[run] = res_cont
-
 
     # Aggregate results
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
@@ -349,10 +347,10 @@ def run_experiment_configuration(
     if args.optimizer == 'Adam':
         args.c = (args.c_1, args.c_2)
         beta = (1 - tau * args.c_1, 1 - tau * args.c_2)
-        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta} ====================\n")
+        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta}, initial points = {initial_points_before_disc.item()} ====================\n")
     elif args.optimizer == 'RMSProp':
         beta = 1 - tau * args.c
-        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} ====================\n")
+        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta}, initial points = {initial_points_before_disc.item()} ====================\n")
 
     # Create result directory
     result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{args.final_time}"
@@ -380,7 +378,7 @@ def run_experiment_configuration(
     noise = torch.randint(0, 2, (5000, initial_points_before_disc.shape[0]))
     
     # Setup time parameters
-    num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item())
+    num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item()) + 1 # +1 for t0 = 0
     print(f'Number of steps: {num_steps}')
         
     t0 = time.time()
@@ -422,7 +420,8 @@ def run_experiment_configuration(
         'skipped_initial_points': args.skip_initial_point,
         'initial_points_before_disc': initial_points_before_disc,
         'initial_points_after_disc': initial_points,
-        'simulation keys': ['disc']
+        'simulation keys': ['disc'],
+        'points_for_poly': points
     }
     if '1st_order_sde' in args.simulations:
         final_results['1_order_stoc'] = res_1_order_stoc
@@ -449,7 +448,7 @@ def run_experiment_configuration(
             save_code=True
         )
         for sim in final_results['simulation keys']:
-            artifact = wandb.Artifact(f"final_results_tau_{tau}", type="results")
+            artifact = wandb.Artifact(f"final_results", type="results")
             artifact.add_file(os.path.join(result_dir, f'results_regime{args.regime}_tau{tau}_c{args.c}.pt'))
             wandb.log_artifact(artifact)
             wandb.log({f"time_elapsed_for_{sim}": final_results[sim]['time_elapsed'], 'runs': effective_runs})
@@ -482,11 +481,11 @@ def run_experiment_configuration(
                     wandb.plot.histogram(table, "value", title=f"{final_results['regime']} {sim} Final Distribution")
             })
 
-        plot_poly_result(final_results, poly, tau, result_dir, args)
+        plot_poly_result(final_results, poly, result_dir, wandb_bool = args.wandb)
         if final_results['disc']['final_distribution'].mean() > 0:
-            plot_poly_result(final_results, poly, tau, result_dir, args, xlim = (0.5, 1.5))
+            plot_poly_result(final_results, poly, result_dir, wandb_bool = args.wandb, xlim = (0.5, 1.5))
         else:
-            plot_poly_result(final_results, poly, tau, result_dir, args, xlim = (-1.5, -0.5))
+            plot_poly_result(final_results, poly, result_dir, wandb_bool = args.wandb, xlim = (-1.5, -0.5))
 
         wandb.finish()
 
@@ -500,7 +499,7 @@ def main():
     
     print("Starting Neural Network Training with RMSProp SDE Approximations")
     print(f"Regime: {args.regime}")
-    print(f"Parameters: tau={args.tau_list}, c={args.c}, sigma={args.sigma_list}")
+    print(f"Parameters: tau={args.tau_list}, c={args.c}")
     print(f"Number of runs: {args.num_runs}")
     
     
