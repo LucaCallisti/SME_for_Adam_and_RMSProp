@@ -4,20 +4,19 @@ import os
 import torch
 import wandb
 
-def plot_poly_result(final_results, poly, tau, result_dir, args, xlim = None):
+def plot_poly_result(final_results, poly, tau, result_dir, args):
     initial_before = final_results['initial_points_before_disc'].cpu().numpy()
     initial_after = final_results['initial_points_after_disc'][0].cpu().numpy()
 
-    if xlim is not None:
-        x = torch.linspace(xlim[0], xlim[1], 1000)
-    else:
-        liminf = poly.coeff_1[0]
-        limsup = poly.coeff_2[1]
-        if liminf > initial_before:
-            liminf = initial_before
-        if limsup < initial_after:
-            limsup = initial_after
-        x = torch.linspace(liminf - 0.25, limsup + 0.25, 1000)
+
+    liminf = poly.x_liminf
+    limsup = poly.x_limsup
+    if liminf > initial_before:
+        liminf = float(initial_before)
+    if limsup < initial_before:
+        limsup = float(initial_before)
+    x = torch.linspace(liminf, limsup, 1000)
+
     f1 = poly.f1(x).cpu().numpy()
     f2 = poly.f2(x).cpu().numpy()
     f = poly.f(x).cpu().numpy()

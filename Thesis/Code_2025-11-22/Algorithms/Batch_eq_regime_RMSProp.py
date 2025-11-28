@@ -168,9 +168,10 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
 
-        g = funz.noisy_grad_batcheq(x, gamma, tau)
-        path_v[:, step+1] = beta * v + tau**2 * c * g**2
-        path_x[:, step+1] = x - tau * g / (torch.sqrt(v) + epsilon)
+        grad = funz.noisy_grad_batcheq(x, gamma, tau)
+
+        path_v[:, step+1] = beta * v + tau**2 * c * grad**2
+        path_x[:, step+1] = x - tau * grad / (torch.sqrt(v) + epsilon)
 
         # path_v[:, step+1] = beta * v + lr**2 * c * torch.pow(expected_grad, 2) + lr * c * noise**2 + 2 * lr**(3/2) * c  * noise * expected_grad
         # path_x[:, step+1] = x - lr * expected_grad / (torch.sqrt(path_v[:, step]) + epsilon) - torch.sqrt(lr) * noise / (torch.sqrt(path_v[:, step]) + epsilon) 
