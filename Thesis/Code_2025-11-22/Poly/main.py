@@ -451,7 +451,7 @@ def run_experiment_configuration(
         wandb.init(
             project='Poly2',
             name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
-            config=vars(args)+{'initial point bf disc' : initial_points_before_disc.item():.2f},
+            config=vars(args)+{'initial point bf disc' : f"{initial_points_before_disc.item():.2f}"  },
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
         )
