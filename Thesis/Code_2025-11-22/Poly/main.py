@@ -37,7 +37,7 @@ def parse_arguments() -> argparse.Namespace:
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
     # [2.5, 0.5, 0.1, 0.0, -0.1, -0.4, -1.3, -1.5]
-    train_group.add_argument('--initial_points', type=float, default=[-1.3], help='Initial points for optimization')
+    train_group.add_argument('--initial_points', type=float, nargs='+', default=[2.5, 0.5, 0.1, 0.0, -0.1, -0.4, -1.3, -1.5], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.05], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
@@ -451,7 +451,7 @@ def run_experiment_configuration(
         wandb.init(
             project='Poly2',
             name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
-            config=vars(args),
+            config=vars(args)+{'initial point bf disc' : initial_points_before_disc.item():.2f},
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
         )
@@ -534,11 +534,11 @@ if __name__ == "__main__":
 """
 Batch equivalent:
 python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 1; 
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
 
 Balistic
 python -m Poly.main --regime balistic --optimizer RMSProp --sigma 1 --batch-size-simulation -1; 
 
+python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
 python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1; 
 python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10; 
 
