@@ -37,7 +37,6 @@ class Adam_SDE_2order_batch_equivalent_regime(SDE_basic):
     
     def f(self, t, x):
         self.divide_input(x, t)
-        self.Verbose(t)       
         
         v_reg = self.regularizer.regulariz_function(self.v)
         v_reg_grad = self.regularizer.derivative_regulariz_function(self.v)
@@ -51,6 +50,7 @@ class Adam_SDE_2order_batch_equivalent_regime(SDE_basic):
         coef_v = self.b_0_v() + self.eta * self.b_1_v(t, denom)
 
         self.drift = torch.concat((coef_theta, coef_m, coef_v), dim = 1)
+        self.Verbose(t)       
         self.is_it_Nan(self.drift, x, t, 'drift 2 order')
 
         return self.drift
@@ -136,7 +136,6 @@ class Adam_SDE_1order_batch_equivalent_regime(Adam_SDE_2order_batch_equivalent_r
         self.chronometer(t)  
         self.divide_input(x, t)
   
-        self.Verbose(t)  
 
         # Theta coefficient
         denom = 1/(torch.sqrt(self.v) + self.eps * torch.sqrt(self.gamma_2(t)))
@@ -145,6 +144,7 @@ class Adam_SDE_1order_batch_equivalent_regime(Adam_SDE_2order_batch_equivalent_r
         coef_v = self.b_0_v()
         self.drift = torch.concat((coef_theta, coef_m, coef_v), dim = 1)
 
+        self.Verbose(t)  
         self.is_it_Nan(self.drift, x, t, 'drift 1 order')
         return self.drift
 
@@ -214,17 +214,18 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
         m = path_m[:, step]
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
-        g = funz.noisy_grad_batcheq(x, gamma, lr)
+        grad = funz.noisy_grad_batcheq(x, gamma, lr)
 
         gamma_1 = 1-beta_1**(step+2) * torch.ones_like(v)
         sqrt_gamma_2 = torch.sqrt(torch.tensor(1-beta_2**(step+1) )) * torch.ones_like(v)
 
-        path_v[:, step+1] = beta_2 * v + lr**2 * c_2 * torch.pow(g, 2)
-        path_m[:, step+1] = beta_1 * m + lr * c_1 * g
+        path_v[:, step+1] = beta_2 * v + lr**2 * c_2 * torch.pow(grad, 2)
+        path_m[:, step+1] = beta_1 * m + lr * c_1 * grad
 
         path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
-        if verbose and step*lr >= temp:
+        if (verbose and step*lr >= temp) or True:
             temp += 0.1
+            print(f'Time: {step*lr:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
         
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])

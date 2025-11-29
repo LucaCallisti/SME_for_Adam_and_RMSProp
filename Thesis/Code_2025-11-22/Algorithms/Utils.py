@@ -63,7 +63,9 @@ class SDE_basic(torchsde.SDEIto):
         if self.verbose and t>self.temp: 
             self.chronometer(t)
             print(f't: {t:.1f}', end='\r')
-            self.temp += 1 
+            self.temp += 1
+            # print(f't: {t:.1f}, theta {self.theta[154].item()}, v {self.v[154].item()}, m {self.m[154].item()},drift {self.drift[154]}, self.diag_Sigma {self.diag_Sigma[154].item()}' )
+            # self.temp += 0.05 
 
     def divide_input(self, x, t):
         if self.eq == 'RMSProp':
@@ -154,5 +156,23 @@ def get_regime_functions(regime: str, optimizer: str) -> Dict[str, Any]:
             }
         else:
             raise ValueError(f"Unknown optimizer: {optimizer}")
+    else:
+        raise ValueError(f"Unknown regime: {regime}")
+    
+
+def get_batch_size(sigma, tau, regime):
+    if regime == 'balistic':
+        b_size = int( sigma**(-2) )
+    elif regime == 'batch_equivalent':
+        b_size = int( tau * sigma**(-2) )
+    else:
+        raise ValueError(f"Unknown regime: {regime}")
+    assert b_size > 0, "Batch size must be positive"
+    return b_size
+def get_sigma(batch_size, tau, regime):
+    if regime == 'balistic':
+        return batch_size**(-0.5)
+    elif regime == 'batch_equivalent':
+        return (batch_size / tau)**(-0.5)
     else:
         raise ValueError(f"Unknown regime: {regime}")
