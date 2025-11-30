@@ -453,7 +453,7 @@ def run_experiment_configuration(
     if args.wandb:
         wandb.init(
             project='Poly2',
-            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
+            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
             config=vars(args)| {'initial point bf disc' : initial_points_before_disc.item()  },
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
@@ -524,7 +524,7 @@ def main():
         for initial_point in args.initial_points:
             set_seed(args.starting_seed)
             initial_points_before_disc = torch.tensor([initial_point])
-            final_time = args.final_time if torch.abs(initial_points_before_disc) > 0.2 else args.final_time * 5
+            final_time = args.final_time if torch.abs(initial_points_before_disc) > 0.2 else args.final_time * 20
             run_experiment_configuration(
                 args, tau, args.sigma, args.points, initial_points_before_disc, final_time
             )
