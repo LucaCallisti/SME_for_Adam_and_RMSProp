@@ -64,6 +64,7 @@ def parse_arguments() -> argparse.Namespace:
     seed_group.add_argument('--seed-2nd', type=int, default=200, help='Random seed for 2nd order SDE simulations')
     seed_group.add_argument('--seed-parameters', type=int, default=50, help='Random seed for initial parameters')
     seed_group.add_argument('--seed-noise', type=int, default=25, help='Random seed for noise generation')
+    seed_group.add_argument('--starting-seed', type=int, default=10, help='Starting seed for multiple experiment runs')
 
     # Output configuration
     output_group = parser.add_argument_group('Output Configuration')
@@ -335,7 +336,8 @@ def run_experiment_configuration(
     tau: float,
     sigma_value: float,
     points: list,
-    initial_points_before_disc: torch.Tensor = None
+    initial_points_before_disc: torch.Tensor,
+    final_time: float,
 ) -> None:
     """
     Run a complete experiment configuration for given hyperparameters.
@@ -359,7 +361,7 @@ def run_experiment_configuration(
         print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta}, initial points = {initial_points_before_disc.item()} ====================\n")
 
     # Create result directory
-    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{args.final_time}_sigma_{sigma_value}"
+    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{final_time}_sigma_{sigma_value}"
     result_dir = os.path.join(result_dir, args.regime.replace(' ', '_'))
     os.makedirs(result_dir, exist_ok=True)
     
@@ -384,7 +386,7 @@ def run_experiment_configuration(
     noise = torch.randint(0, 2, (5000, initial_points_before_disc.shape[0], args.batch_size_simulation))
     
     # Setup time parameters
-    num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item()) + 1 # +1 for t0 = 0
+    num_steps = int(torch.ceil(torch.tensor(final_time / tau)).item()) + 1 # +1 for t0 = 0
     print(f'Number of steps: {num_steps}')
         
     t0 = time.time()
@@ -396,11 +398,12 @@ def run_experiment_configuration(
         dim_weights, args.seed_disc, args.verbose
     )
     initial_points = res_disc['initial_point'].to(args.device)
+    print('initial points before', initial_points_before_disc, 'after', initial_points)
     # Run 1st order SDE simulations
     res_1_order_det = None
     if '1st_order_sde' in args.simulations:
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
-            args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, args.final_time,
+            args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
             args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_1st, args.device, args.verbose
         )
@@ -408,7 +411,7 @@ def run_experiment_configuration(
     # Run 2nd order SDE simulations
     if '2nd_order_sde' in args.simulations:
         res_2_order = run_sde_simulations(
-            poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, args.final_time,
+            poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
             args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
         )
@@ -416,7 +419,7 @@ def run_experiment_configuration(
     t1 = time.time()
     final_results = {
         'disc': res_disc,
-        'final_time': args.final_time,
+        'final_time': final_time,
         'tau': tau,
         'c': args.c,
         'sigma': sigma_value,
@@ -451,7 +454,7 @@ def run_experiment_configuration(
         wandb.init(
             project='Poly2',
             name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
-            config=vars(args)+{'initial point bf disc' : f"{initial_points_before_disc.item():.2f}"  },
+            config=vars(args)| {'initial point bf disc' : initial_points_before_disc.item()  },
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
         )
@@ -519,9 +522,11 @@ def main():
             assert sigma_aux == args.sigma, f"Provided sigma {args.sigma} does not match computed sigma {sigma_aux} for batch size {args.batch_size_simulation} and tau {tau} in regime {args.regime}."
 
         for initial_point in args.initial_points:
+            set_seed(args.starting_seed)
             initial_points_before_disc = torch.tensor([initial_point])
+            final_time = args.final_time if torch.abs(initial_points_before_disc) > 0.2 else args.final_time * 5
             run_experiment_configuration(
-                args, tau, args.sigma, args.points, initial_points_before_disc
+                args, tau, args.sigma, args.points, initial_points_before_disc, final_time
             )
     
     print("All experiments completed successfully!")

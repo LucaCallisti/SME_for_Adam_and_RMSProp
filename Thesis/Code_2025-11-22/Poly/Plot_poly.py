@@ -4,7 +4,7 @@ import os
 import torch
 import wandb
 
-def plot_poly_result(final_results, poly, tau, result_dir, args):
+def plot_poly_result(final_results, poly, tau, result_dir, args, wandb_bool=True):
     initial_before = final_results['initial_points_before_disc'].cpu().numpy()
     initial_after = final_results['initial_points_after_disc'][0].cpu().numpy()
 
@@ -30,7 +30,7 @@ def plot_poly_result(final_results, poly, tau, result_dir, args):
     dist_2nd = final_results['2_order_stoc']['final_distribution'].cpu().numpy().flatten() if '2_order_stoc' in final_results else None
 
     print(f'mean/min/max of distribution disc: {dist_disc.mean(), dist_disc.min(), dist_disc.max()},1st order: {(dist_1st.mean(), dist_1st.min(), dist_1st.max()) if dist_1st is not None else "N/A"}, 2nd order: {(dist_2nd.mean(), dist_2nd.min(), dist_2nd.max()) if dist_2nd is not None else "N/A"}')
-    breakpoint()
+
     # --- Plot ---
     fig, ax1 = plt.subplots(figsize=(10,6))
 
@@ -51,12 +51,26 @@ def plot_poly_result(final_results, poly, tau, result_dir, args):
     ax2 = ax1.twinx()
 
     bins = 200
+    def safe_hist(ax, data, bins=200, **kwargs):
+        data = np.asarray(data)
+        data = data[np.isfinite(data)]
+        if data.size == 0:
+            return
+        unique = np.unique(data)
+        if unique.size == 1:
+            # tutti i valori uguali: crea un bin attorno al valore
+            val = unique[0]
+            edges = [val - 1e-6, val + 1e-6]
+            ax.hist(data, bins=edges, **kwargs)
+        else:
+            bins_eff = min(bins, unique.size)
+            ax.hist(data, bins=bins_eff, **kwargs)
     # Moltiplichiamo gli istogrammi per il fattore di scala
-    ax2.hist(dist_disc, bins=bins, alpha=0.3, color='#000080', label='Final dist (disc)', weights=np.ones_like(dist_disc), density=True)
+    safe_hist(ax2, dist_disc, bins=bins, alpha=0.3, color='#000080', label='Final dist (disc)', weights=np.ones_like(dist_disc), density=True)
     if dist_1st is not None:
-        ax2.hist(dist_1st, bins=bins, alpha=0.3, color='#FF8000', label='Final dist 1st', weights=np.ones_like(dist_1st), density=True)
+        safe_hist(ax2, dist_1st, bins=bins, alpha=0.3, color='#FF8000', label='Final dist 1st', weights=np.ones_like(dist_1st), density=True)
     if dist_2nd is not None:
-        ax2.hist(dist_2nd, bins=bins, alpha=0.3, color='#808000', label='Final dist 2nd', weights=np.ones_like(dist_2nd), density=True)
+        safe_hist(ax2, dist_2nd, bins=bins, alpha=0.3, color='#808000', label='Final dist 2nd', weights=np.ones_like(dist_2nd), density=True)
 
     ax2.set_ylim(0, 15)
     ax2.set_ylabel('Probability density')
