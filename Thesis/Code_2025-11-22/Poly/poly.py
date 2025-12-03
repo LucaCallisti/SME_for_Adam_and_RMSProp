@@ -39,13 +39,15 @@ class base_poly:
     def hessian_sigma(self, x):
         return ( 0.5 * (self.f1_second(x) - self.f2_second(x))**2 + 0.5 * (self.f1_prime(x) - self.f2_prime(x)) * (self.f1_third(x) - self.f2_third(x)) ).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
     def term_b1_RMSProp_BatchEq(self, x):
-        return (self.Diag_sigma(x) * self.f_third(x)).unsqueeze(-1).unsqueeze(-1)
+        return (self.Diag_sigma(x) * self.f_third(x)).unsqueeze(-1)
     def grad_sigma_sqrt(self, x):
         return 0.5 * ( self.grad_sigma(x) / self.Sigma_sqrt(x).unsqueeze(-1) )
     def hessian_sigma_sqrt(self, x):
         term1 = self.hessian_sigma(x) / self.Sigma_sqrt(x).unsqueeze(-1).unsqueeze(-1)
         term2 = self.grad_sigma_sqrt(x).unsqueeze(-1) * self.grad_sigma(x).unsqueeze(-1) / self.Sigma(x).unsqueeze(-1).unsqueeze(-1)
         return 0.5 * ( term1 + term2 )
+    def hessian_sigma_diag(self, x):
+        return self.hessian_sigma(x).squeeze(-1)
 
 
 class aux_function_poly_Wshaped:

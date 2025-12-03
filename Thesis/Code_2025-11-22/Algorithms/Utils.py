@@ -23,7 +23,7 @@ class SDE_basic(torchsde.SDEIto):
     def update_quantities(self, theta, t):
         self.diffusion = None
         self.drift = None
-
+ 
         self.f_grad = self.fun.grad(theta)
         assert self.f_grad.dim() == 2, "f_grad should be of shape (batch_size, dim)"
         self.f_hessian = self.fun.hessian(theta)
@@ -49,10 +49,14 @@ class SDE_basic(torchsde.SDEIto):
             assert self.grad_Sigma_diag.dim() == 3, "grad_Sigma_diag should be of shape (batch_size, dim, dim)"  # where the first dim is for the derivative
             self.hessian_Sigma = self.sigma_value**2 * self.fun.hessian_sigma(theta)
             assert self.hessian_Sigma.dim() == 5, "hessian_Sigma should be of shape (batch_size, dim, dim, dim, dim)"  # where the first and second dim is for the second derivative
+            self.hessian_Sigma_diag = self.sigma_value**2 * self.fun.hessian_sigma_diag(theta)
+            assert self.hessian_Sigma_diag.dim() == 4, "hessian_Sigma_diag should be of shape (batch_size, dim, dim, dim)"  # where the first and second dim is for the second derivative
             self.grad_Sigma_sqrt = self.sigma_value * self.fun.grad_sigma_sqrt(theta)
             assert self.grad_Sigma_sqrt.dim() == 4, "grad_Sigma_sqrt should be of shape (batch_size, dim, dim, dim)"  # where the first dim is for the derivative
             self.hessian_Sigma_sqrt = self.sigma_value * self.fun.hessian_sigma_sqrt(theta)
             assert self.hessian_Sigma_sqrt.dim() == 5, "hessian_Sigma_sqrt should be of shape (batch_size, dim, dim, dim, dim)"  # where the first and second dim is for the second derivative
+
+
 
     def is_it_Nan(self, input, x, t, where):
         if torch.isnan(input).any():

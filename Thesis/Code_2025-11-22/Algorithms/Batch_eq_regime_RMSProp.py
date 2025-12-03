@@ -62,9 +62,9 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
         first_term =  self.c * self.f_grad_square
         second_term = 0.5 * self.c**2 * (self.diag_Sigma  - self.v)
         if not self.constant_noise:
-            additional_term = - 0.5 * torch.bmm( self.grad_Sigma_diag, self.f_grad  * denom)
+            additional_term = - 0.5 * torch.bmm( self.grad_Sigma_diag, (self.f_grad  * denom).unsqueeze(2)).squeeze(2)
             OuterProduct = torch.einsum('ki,kj->kij', denom, denom)
-            sum = torch.einsum('bij, bjilk -> bkl', OuterProduct * self.Sigma, self.Sigma) 
+            sum = torch.einsum('bij, bjik -> bk', OuterProduct * self.Sigma, self.hessian_Sigma_diag) 
             additional_term -= 0.5 * self.tau * sum 
         else:
             additional_term = 0
