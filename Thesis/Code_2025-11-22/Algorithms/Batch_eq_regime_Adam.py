@@ -223,7 +223,7 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
         path_m[:, step+1] = beta_1 * m + lr * c_1 * grad
 
         path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
-        if (verbose and step*lr >= temp) or True:
+        if verbose and step*lr >= temp:
             temp += 0.1
             print(f'Time: {step*lr:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
         

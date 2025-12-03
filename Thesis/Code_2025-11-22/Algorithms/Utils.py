@@ -29,7 +29,7 @@ class SDE_basic(torchsde.SDEIto):
         self.f_hessian = self.fun.hessian(theta)
         assert self.f_hessian.dim() == 3, "f_hessian should be of shape (batch_size, dim, dim)"
         self.Sigma_sqrt = self.sigma_value*self.fun.Sigma_sqrt(theta)
-        assert self.Sigma_sqrt.dim() == 3, "Sigma_sqrt should be of shape (batch_size, dim)"
+        assert self.Sigma_sqrt.dim() == 3, "Sigma_sqrt should be of shape (batch_size, dim, dim)"
         self.diag_Sigma = self.sigma_value**2 * self.fun.Diag_sigma(theta)
         assert self.diag_Sigma.dim() == 2, "diag_Sigma should be of shape (batch_size, dim)"
         self.square_root_var_z_squared = self.sigma_value**2 * self.fun.square_root_var_z_squared(theta)
@@ -41,12 +41,18 @@ class SDE_basic(torchsde.SDEIto):
             # To do da fare assert
 
         if self.constant_noise is False:
+            self.Sigma = self.sigma_value **2 * self.fun.Sigma(theta)
+            assert self.Sigma.dim() == 3, "Sigma should be of shape (batch_size, dim, dim)"
             self.grad_Sigma = self.sigma_value**2 * self.fun.grad_sigma(theta)
             assert self.grad_Sigma.dim() == 4, "grad_Sigma should be of shape (batch_size, dim, dim, dim)"  # where the first dim is for the derivative
             self.grad_Sigma_diag = self.sigma_value**2 * self.fun.grad_sigma_diag(theta)
             assert self.grad_Sigma_diag.dim() == 3, "grad_Sigma_diag should be of shape (batch_size, dim, dim)"  # where the first dim is for the derivative
             self.hessian_Sigma = self.sigma_value**2 * self.fun.hessian_sigma(theta)
             assert self.hessian_Sigma.dim() == 5, "hessian_Sigma should be of shape (batch_size, dim, dim, dim, dim)"  # where the first and second dim is for the second derivative
+            self.grad_Sigma_sqrt = self.sigma_value * self.fun.grad_sigma_sqrt(theta)
+            assert self.grad_Sigma_sqrt.dim() == 4, "grad_Sigma_sqrt should be of shape (batch_size, dim, dim, dim)"  # where the first dim is for the derivative
+            self.hessian_Sigma_sqrt = self.sigma_value * self.fun.hessian_sigma_sqrt(theta)
+            assert self.hessian_Sigma_sqrt.dim() == 5, "hessian_Sigma_sqrt should be of shape (batch_size, dim, dim, dim, dim)"  # where the first and second dim is for the second derivative
 
     def is_it_Nan(self, input, x, t, where):
         if torch.isnan(input).any():

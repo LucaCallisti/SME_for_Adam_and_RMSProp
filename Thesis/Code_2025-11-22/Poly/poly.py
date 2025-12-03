@@ -26,6 +26,8 @@ class base_poly:
         return self.f_second(x).unsqueeze(-1)
     def Diag_sigma(self, x):
         return 0.25 * (self.f1_prime(x) - self.f2_prime(x))**2
+    def Sigma(self, x):
+        return self.Diag_sigma(x).unsqueeze(-1)
     def Sigma_sqrt(self, x):
         return torch.sqrt( self.Diag_sigma(x).clamp(min=1e-12) ).unsqueeze(-1)
     def square_root_var_z_squared(self, x):
@@ -38,6 +40,12 @@ class base_poly:
         return ( 0.5 * (self.f1_second(x) - self.f2_second(x))**2 + 0.5 * (self.f1_prime(x) - self.f2_prime(x)) * (self.f1_third(x) - self.f2_third(x)) ).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
     def term_b1_RMSProp_BatchEq(self, x):
         return (self.Diag_sigma(x) * self.f_third(x)).unsqueeze(-1).unsqueeze(-1)
+    def grad_sigma_sqrt(self, x):
+        return 0.5 * ( self.grad_sigma(x) / self.Sigma_sqrt(x).unsqueeze(-1) )
+    def hessian_sigma_sqrt(self, x):
+        term1 = self.hessian_sigma(x) / self.Sigma_sqrt(x).unsqueeze(-1).unsqueeze(-1)
+        term2 = self.grad_sigma_sqrt(x).unsqueeze(-1) * self.grad_sigma(x).unsqueeze(-1) / self.Sigma(x).unsqueeze(-1).unsqueeze(-1)
+        return 0.5 * ( term1 + term2 )
 
 
 class aux_function_poly_Wshaped:

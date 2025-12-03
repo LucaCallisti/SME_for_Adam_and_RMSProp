@@ -42,17 +42,17 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=512, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=1000.0, help='Final time for SDE integration')
+    train_group.add_argument('--num-runs', type=int, default=128, help='Number of simulation runs for averaging')
+    train_group.add_argument('--final-time', type=float, default=10_000.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=512, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=128, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=[], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -443,6 +443,7 @@ def run_experiment_configuration(
     )
     y0 = res_disc['initial_point'].to(args.device)
     # Run 1st order SDE simulations
+    res_1_order_det = None
     if '1st_order_sde' in args.simulations:
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
             args.regime, args.optimizer, model_factory, regime_funcs, y0, tau, args.c, args.final_time,

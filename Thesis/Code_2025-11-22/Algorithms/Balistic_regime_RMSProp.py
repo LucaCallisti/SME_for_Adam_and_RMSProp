@@ -176,6 +176,7 @@ def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, sk
     max_lenghth_gamma_list = 1000
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
     
+    temp = 0
     for step in range(num_steps-1):
         if step % max_lenghth_gamma_list == 0:            
             indices = torch.randint(0, noise_shuffled.shape[0], (batch_size, max_lenghth_gamma_list))
@@ -197,6 +198,10 @@ def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, sk
 
         path_v[:, step+1] = (1 - c * lr) * v + c * lr * grad**2
         path_x[:, step+1] = x - lr * grad / (torch.sqrt(path_v[:, step]) + epsilon)
+
+        if (verbose or True) and lr * step > temp:
+            temp += 50
+            print(f"Discrete RMSProp Balistic Regime - {lr * step:.2f} / {lr * (num_steps-1):.2f} ")
 
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])

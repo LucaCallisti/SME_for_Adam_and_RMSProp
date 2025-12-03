@@ -451,7 +451,7 @@ def run_experiment_configuration(
         wandb.init(
             project='Poly2',
             name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
-            config=vars(args)+{'initial point bf disc' : initial_points_before_disc.item():.2f},
+            config=vars(args)+{'initial point bf disc' : initial_points_before_disc.item()},
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
         )
@@ -533,12 +533,13 @@ if __name__ == "__main__":
 
 """
 Batch equivalent:
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 1; 
+python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
+python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
 
 Balistic
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 1 --batch-size-simulation -1; 
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1; 
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
 
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
 python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1; 
 python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10; 
 

@@ -61,7 +61,15 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
     def b_1_v(self, denom):
         first_term =  self.c * self.f_grad_square
         second_term = 0.5 * self.c**2 * (self.diag_Sigma  - self.v)
-        return  first_term + second_term
+        if not self.constant_noise:
+            additional_term = - 0.5 * torch.bmm( self.grad_Sigma_diag, self.f_grad  * denom)
+            OuterProduct = torch.einsum('ki,kj->kij', denom, denom)
+            sum = torch.einsum('bij, bjilk -> bkl', OuterProduct * self.Sigma, self.Sigma) 
+            additional_term -= 0.5 * self.tau * sum 
+        else:
+            additional_term = 0
+
+        return  first_term + second_term + additional_term
 
     def g(self, t, x):
         self.divide_input(x, t)
@@ -73,9 +81,23 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
 
         M_11 = torch.bmm(torch.diag_embed(denom), self.Sigma_sqrt)
         OuterProduct = torch.einsum('ki,kj->kij',  denom, denom)
-        
-        M_11= M_11 +  self.tau* 0.5 * torch.bmm( OuterProduct * self.f_hessian, self.Sigma_sqrt) + self.tau* 0.25 * self.c * torch.bmm(torch.diag_embed( (denom**3)*(self.diag_Sigma - self.v) * v_reg_grad ), self.Sigma_sqrt)
-        M_21 = -self.tau* 2*self.c*torch.bmm(torch.diag_embed(self.f_grad), self.Sigma_sqrt)
+        Lambda_1 = 0.5 * torch.bmm( OuterProduct * self.f_hessian, self.Sigma_sqrt) + 0.25 * self.c * torch.bmm(torch.diag_embed( (denom**3)*(self.diag_Sigma - self.v) * v_reg_grad ), self.Sigma_sqrt)
+        if not self.constant_noise:
+            term_aux = torch.einsum('bi, bilk -> blk', denom * self.f_grad, self.grad_Sigma_sqrt)
+            Lambda_1 -= 0.5 * torch.bmm(torch.diag_embed(denom) , term_aux)
+
+            term_aux = torch.einsum('bij, bijlk -> blk', OuterProduct * self.Sigma, self.hessian_Sigma_sqrt)
+            Lambda_1 += torch.bmm(torch.diag_embed(denom), term_aux)
+
+            term_aux = torch.einsum('bij, bilk, bjlk -> blk', OuterProduct * self.Sigma, self.grad_Sigma_sqrt, self.grad_Sigma_sqrt)
+            term_inv = torch.linalg.inv( torch.bmm(torch.diag_embed(denom), self.Sigma_sqrt))
+            Lambda_1 += torch.bmm(term_inv , term_aux) 
+
+        M_11 += self.tau * Lambda_1
+        Lambda_2 = - 2*self.c*torch.bmm(torch.diag_embed(self.f_grad), self.Sigma_sqrt)
+        if not self.constant_noise:
+            Lambda_2 = Lambda_2 - self.c * 0.5 * torch.bmm( torch.bmm(self.grad_Sigma_diag, torch.diag_embed(denom)) , self.Sigma_sqrt )
+        M_21 = self.tau * Lambda_2
         M_22 = self.c * torch.sqrt(self.tau)*self.square_root_var_z_squared
         
         M_12 = torch.zeros_like(M_11)
