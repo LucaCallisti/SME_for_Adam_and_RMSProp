@@ -336,6 +336,7 @@ def run_experiment_configuration(
     tau: float,
     sigma_value: float,
     points: list,
+    final_time: float,
     initial_points_before_disc: torch.Tensor = None
 ) -> None:
     """
@@ -360,7 +361,7 @@ def run_experiment_configuration(
         print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} Starting point {initial_points_before_disc} ====================\n")
 
     # Create result directory
-    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{args.final_time}_sigma_{sigma_value}"
+    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{final_time}_sigma_{sigma_value}"
     result_dir = os.path.join(result_dir, args.regime.replace(' ', '_'))
     os.makedirs(result_dir, exist_ok=True)
     
@@ -368,7 +369,7 @@ def run_experiment_configuration(
     poly = Poly2(*points)
     
     # Setup time parameters
-    num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item())
+    num_steps = int(torch.ceil(torch.tensor(final_time / tau)).item())
     print(f'Number of steps: {num_steps}')
     
     # Get regime functions
@@ -385,7 +386,7 @@ def run_experiment_configuration(
     noise = torch.randint(0, 2, (5000, initial_points_before_disc.shape[0], args.batch_size_simulation))
     
     # Setup time parameters
-    num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item())
+    num_steps = int(torch.ceil(torch.tensor(final_time / tau)).item())
     print(f'Number of steps: {num_steps}')
         
     t0 = time.time()
@@ -401,7 +402,7 @@ def run_experiment_configuration(
     res_1_order_det = None
     if '1st_order_sde' in args.simulations:
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
-            args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, args.final_time,
+            args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
             args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_1st, args.device, args.verbose
         )
@@ -409,7 +410,7 @@ def run_experiment_configuration(
     # Run 2nd order SDE simulations
     if '2nd_order_sde' in args.simulations:
         res_2_order = run_sde_simulations(
-            poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, args.final_time,
+            poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
             args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
         )
@@ -417,7 +418,7 @@ def run_experiment_configuration(
     t1 = time.time()
     final_results = {
         'disc': res_disc,
-        'final_time': args.final_time,
+        'final_time': final_time,
         'tau': tau,
         'c': args.c,
         'sigma': sigma_value,
@@ -450,7 +451,7 @@ def run_experiment_configuration(
     if args.wandb:
         wandb.init(
             project='Poly2',
-            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{args.final_time}',
+            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
             config=vars(args).update({'initial point bf disc' : initial_points_before_disc.item()}),
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
@@ -520,8 +521,12 @@ def main():
 
         for initial_point in args.initial_points:
             initial_points_before_disc = torch.tensor([initial_point])
+            if torch.abs(initial_points_before_disc) < 0.3:
+                final_time = args.final_time * 20
+            else:
+                final_time = args.final_time
             run_experiment_configuration(
-                args, tau, args.sigma, args.points, initial_points_before_disc
+                args, tau, args.sigma, args.points, final_time=final_time, initial_points_before_disc=initial_points_before_disc
             )
     
     print("All experiments completed successfully!")
