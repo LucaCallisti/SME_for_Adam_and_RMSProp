@@ -177,6 +177,7 @@ def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, sk
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
     
     temp = 0
+    temp1 = 0
     for step in range(num_steps-1):
         if step % max_lenghth_gamma_list == 0:            
             indices = torch.randint(0, noise_shuffled.shape[0], (batch_size, max_lenghth_gamma_list))

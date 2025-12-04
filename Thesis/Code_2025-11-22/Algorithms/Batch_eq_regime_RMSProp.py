@@ -108,12 +108,6 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
 
         return self.diffusion
     
-    def divide_input(self, x, t):
-        aux = x.shape[1] // 2 
-        theta, self.v = x[:, :aux], x[:, aux:2*aux]
-        if (self.v<0).sum() > 0 and self.verbose: print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
-        if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
-        self.theta = theta
     
 class RMSprop_SDE_1order_batch_eq_regime(RMSprop_SDE_2order_batch_eq_regime):
     def f(self, t, x):

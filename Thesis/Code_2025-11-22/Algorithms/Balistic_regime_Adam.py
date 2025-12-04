@@ -118,13 +118,6 @@ class Adam_SDE_2order_balistic_regime(SDE_basic):
         self.diffusion = torch.sqrt(self.eta) * torch.cat((M_top, M_middle, M_bottom), dim=1)
      
         return self.diffusion
-    
-    def divide_input(self, x, t):
-        aux = x.shape[1] // 3
-        theta, self.m, self.v = x[:, :aux], x[:, aux:2*aux], x[:, 2*aux:]
-        if (self.v<0).sum() > 0 and self.verbose: print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
-        if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
-        self.theta = theta
   
 
 class Adam_SDE_1order_balistic_regime(Adam_SDE_2order_balistic_regime):

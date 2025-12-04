@@ -81,21 +81,18 @@ class SDE_basic(torchsde.SDEIto):
         if self.eq == 'RMSProp':
             aux = x.shape[1] // 2 
             theta, self.v = x[:, :aux], x[:, aux:2*aux]
-            if (self.v<0).sum() > 0 and self.verbose and t > self.last_neg_value + 1: 
-                print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
-                self.last_neg_value = t
             if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
             self.theta = theta
         elif self.eq == 'Adam':
             aux = x.shape[1] // 3
             theta, self.m, self.v = x[:, :aux], x[:, aux:2*aux], x[:, 2*aux:]
-            if (self.v<0).sum() > 0 and self.verbose and t > self.last_neg_value + 1: 
-                print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
-                self.last_neg_value = t
             if self.theta_old is None or (self.theta_old != theta).any(): self.update_quantities(theta, t)
             self.theta = theta
         else:
             raise ValueError(f"Unknown equation type: {self.eq}")
+        if (self.v<0).sum() > 0 and self.verbose and t > self.last_neg_value + 1: 
+            print('Warning: negative values in v', (self.v<0).sum().item(), self.v.min().item(), 'at time ', t)
+            self.last_neg_value = t
 
 def get_regime_functions(regime: str, optimizer: str) -> Dict[str, Any]:
     """
