@@ -81,7 +81,7 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
 
         M_11 = torch.bmm(torch.diag_embed(denom), self.Sigma_sqrt)
         OuterProduct = torch.einsum('ki,kj->kij',  denom, denom)
-        Lambda_1 = 0.5 * torch.bmm( OuterProduct * self.f_hessian, self.Sigma_sqrt) + 0.25 * self.c * torch.bmm(torch.diag_embed( (denom**3)*(self.diag_Sigma - self.v) * v_reg_grad ), self.Sigma_sqrt)
+        Lambda_1 = 0.5 * torch.bmm( OuterProduct * self.f_hessian, self.Sigma_sqrt) + 0.25 * torch.bmm(torch.diag_embed( (denom**3)*(self.diag_Sigma - self.v) * v_reg_grad ), self.Sigma_sqrt)
         if not self.constant_noise:
             term_aux = torch.einsum('bi, bilk -> blk', denom * self.f_grad, self.grad_Sigma_sqrt)
             Lambda_1 -= 0.5 * torch.bmm(torch.diag_embed(denom) , term_aux)
@@ -93,11 +93,11 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
             term_inv = torch.linalg.inv( torch.bmm(torch.diag_embed(denom), self.Sigma_sqrt))
             Lambda_1 += torch.bmm(term_inv , term_aux) 
 
-        M_11 += self.tau * Lambda_1
-        Lambda_2 = - 2*self.c*torch.bmm(torch.diag_embed(self.f_grad), self.Sigma_sqrt)
+        M_11 += self.tau * self.c * Lambda_1
+        Lambda_2 = - 2 * torch.bmm(torch.diag_embed(self.f_grad), self.Sigma_sqrt)
         if not self.constant_noise:
-            Lambda_2 = Lambda_2 - self.c * 0.5 * torch.bmm( torch.bmm(self.grad_Sigma_diag, torch.diag_embed(denom)) , self.Sigma_sqrt )
-        M_21 = self.tau * Lambda_2
+            Lambda_2 = Lambda_2 - 0.5 * torch.bmm( torch.bmm(self.grad_Sigma_diag, torch.diag_embed(denom)) , self.Sigma_sqrt )
+        M_21 = self.tau * self.c * Lambda_2
         M_22 = self.c * torch.sqrt(self.tau)*self.square_root_var_z_squared
         
         M_12 = torch.zeros_like(M_11)
@@ -192,9 +192,9 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         # path_v[:, step+1] = beta * v + lr**2 * c * torch.pow(expected_grad, 2) + lr * c * noise**2 + 2 * lr**(3/2) * c  * noise * expected_grad
         # path_x[:, step+1] = x - lr * expected_grad / (torch.sqrt(path_v[:, step]) + epsilon) - torch.sqrt(lr) * noise / (torch.sqrt(path_v[:, step]) + epsilon) 
 
-        if verbose and step*tau >= temp:
+        if (verbose and tau * step > temp) or True:
             temp += 1
-            print(f'Step {step}, v: {path_v[step]}, theta: {path_x[step]}')
+            print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, tau {tau}, epsilon {epsilon}')
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
         return torch.concat((path_x, path_v), dim = 2), Loss_values

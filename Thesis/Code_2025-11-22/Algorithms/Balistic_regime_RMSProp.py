@@ -162,8 +162,8 @@ class RMSprop_deterministic(RMSprop_SDE_2order_balistic_regime):
         return self.diffusion
 
 
-def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, skip, epsilon = 1e-6, loss_bool = True, verbose = False):
-    assert abs( (1 - beta) - lr * c) < 1e-6, "Check the parameters: 1 - beta should be equal to lr * c"
+def Discrete_RMProp_balistic_regime(funz, noise, tau, beta, c, num_steps, x_0, skip, epsilon = 1e-6, loss_bool = True, verbose = False):
+    assert abs( (1 - beta) - tau * c) < 1e-6, "Check the parameters: 1 - beta should be equal to tau * c"
     
     batch_size = x_0.shape[0]
     path_x = torch.zeros(batch_size, num_steps, x_0.shape[1], device=x_0.device)
@@ -197,12 +197,12 @@ def Discrete_RMProp_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, sk
             Loss_values[:, step] = funz.loss_batch(x)
         grad = funz.noisy_grad_balistic(x, gamma)
 
-        path_v[:, step+1] = (1 - c * lr) * v + c * lr * grad**2
-        path_x[:, step+1] = x - lr * grad / (torch.sqrt(path_v[:, step]) + epsilon)
+        path_v[:, step+1] = (1 - c * tau) * v + c * tau * grad**2
+        path_x[:, step+1] = x - tau * grad / (torch.sqrt(v) + epsilon)
 
-        if (verbose or True) and lr * step > temp:
-            temp += 50
-            print(f"Discrete RMSProp Balistic Regime - {lr * step:.2f} / {lr * (num_steps-1):.2f} ")
+        if (verbose and tau * step > temp) or True:
+            temp += 1
+            print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, tau {tau}, epsilon {epsilon}')
 
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])

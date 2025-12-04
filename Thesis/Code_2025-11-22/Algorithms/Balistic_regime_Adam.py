@@ -229,7 +229,8 @@ def Discrete_Adam_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, skip
 
         if verbose and step*lr >= temp:
             temp += 1
-            print(f'Step {step}, v: {path_v[step]}, theta: {path_x[step]}')
+            print(f'Time: {step*lr:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, v mean: {path_v[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
+    
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
         return torch.concat((path_x, path_m, path_v), dim = 2), Loss_values

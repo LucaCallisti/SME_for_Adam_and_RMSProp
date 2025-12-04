@@ -394,15 +394,15 @@ def run_experiment_configuration(
         regime_name = 'Balistic'
     elif args.regime == 'batch_equivalent':
         regime_name = 'BatchEq'
-        args.epsilon = args.epsilon / tau  
+        epsilon = args.epsilon / tau  
 
     if args.optimizer == 'Adam':
         args.c = (args.c_1, args.c_2)
         beta = (1 - tau * args.c_1, 1 - tau * args.c_2)
-        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta}, SIGMA = {sigma_value} ====================\n")
+        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta}, SIGMA = {sigma_value}, epsilon {epsilon} ====================\n")
     elif args.optimizer == 'RMSProp':
         beta = 1 - tau * args.c
-        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta}, SIGMA = {sigma_value} ====================\n")
+        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta}, SIGMA = {sigma_value}, epsilon {epsilon} ====================\n")
 
     # Create result directory
     result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_sigma_{sigma_value}_finaltime_{args.final_time}"
@@ -438,7 +438,7 @@ def run_experiment_configuration(
     # Run discrete simulations
     res_disc = run_discrete_simulations(
         model_factory, args.optimizer, regime_funcs, noise, tau, beta, args.c, num_steps, 
-        initial_params, args.skip_initial_point, args.epsilon, args.num_runs, args.batch_size,
+        initial_params, args.skip_initial_point, epsilon, args.num_runs, args.batch_size,
         dim_weights, args.seed_disc, args.device, args.verbose
     )
     y0 = res_disc['initial_point'].to(args.device)
@@ -448,7 +448,7 @@ def run_experiment_configuration(
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
             args.regime, args.optimizer, model_factory, regime_funcs, y0, tau, args.c, args.final_time,
             args.skip_initial_point, initial_params, dim_weights,
-            args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_1st, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_1st, args.device, args.verbose
         )
 
     # # Run 2nd order SDE simulations
@@ -456,7 +456,7 @@ def run_experiment_configuration(
         res_2_order = run_sde_simulations(
             model_factory, args.optimizer, regime_funcs, 'approx_2_fun', y0, tau, args.c, args.final_time,
             args.skip_initial_point, initial_params, dim_weights,
-            args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
         )
     
     t1 = time.time()

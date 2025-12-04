@@ -221,12 +221,12 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
 
         path_v[:, step+1] = beta_2 * v + lr**2 * c_2 * torch.pow(grad, 2)
         path_m[:, step+1] = beta_1 * m + lr * c_1 * grad
-
         path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
-        if verbose and step*lr >= temp:
-            temp += 0.1
-            print(f'Time: {step*lr:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
         
+        if verbose and step*lr >= temp:
+            temp += 1
+            print(f'Time: {step*lr:.2f}, x mean: {path_x[:,step+1,:].mean().item():.4f}, v mean: {v.mean().item():.4f}, grad mean: {grad.mean().item():.4f}, m mean: {path_m[:, step+1].mean().item():.4f}, gamma1: {gamma_1.mean().item():.4f}, sqrt_gamma2: {sqrt_gamma_2.mean().item():.4f}')
+
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
         return torch.concat((path_x, path_m, path_v), dim = 2), Loss_values

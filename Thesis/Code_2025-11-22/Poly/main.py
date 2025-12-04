@@ -37,7 +37,7 @@ def parse_arguments() -> argparse.Namespace:
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
     # [2.5, 0.5, 0.1,  -0.1, -0.4, -1.3, -1.5]
-    train_group.add_argument('--initial_points', type=float, nargs='+', default=[2.5, 0.5, 0.1,-0.1, -0.4, -1.3, -1.5], help='Initial points for optimization')
+    train_group.add_argument('--initial_points', type=float, nargs='+', default=[2.5], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.05], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
@@ -45,16 +45,16 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--sigma', type=float, default=-1, help='Noise variance values to test')
     train_group.add_argument('--batch-size-simulation', type = int, default=-1, help='Batch size for simulations')
     train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=10.0, help='Final time for SDE integration')
+    train_group.add_argument('--final-time', type=float, default=1.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
-    train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
+    train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
     train_group.add_argument('--batch-size', type=int, default=1024, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='batch_equivalent', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=[], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -194,6 +194,7 @@ def run_discrete_simulations(
         if verbose:
             print(f"[DISCRETE] Simulation {run+1}/{num_batched_runs}...")
 
+        print('epsilon:', epsilon)
         res = regime_funcs['discr_fun'](
             poly, noise, tau, beta, c, num_steps, initial_points.unsqueeze(0).expand(batch_size, -1),
             skip_initial_point, epsilon=epsilon, loss_bool = False
@@ -337,7 +338,8 @@ def run_experiment_configuration(
     sigma_value: float,
     points: list,
     final_time: float,
-    initial_points_before_disc: torch.Tensor = None
+    initial_points_before_disc: torch.Tensor = None,
+    epsilon: float = args.epsilon
 ) -> None:
     """
     Run a complete experiment configuration for given hyperparameters.
@@ -350,15 +352,15 @@ def run_experiment_configuration(
         regime_name = 'Balistic'
     elif args.regime == 'batch_equivalent':
         regime_name = 'BatchEq'
-        args.epsilon = args.epsilon / tau  
+         
 
     if args.optimizer == 'Adam':
         args.c = (args.c_1, args.c_2)
         beta = (1 - tau * args.c_1, 1 - tau * args.c_2)
-        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta} Starting point {initial_points_before_disc} ====================\n")
+        print(f"\n==================== tau = {tau}, C1 = {args.c_1}, C2 = {args.c_2}, BETA = {beta} Starting point {initial_points_before_disc} epsilon {epsilon} ====================\n")
     elif args.optimizer == 'RMSProp':
         beta = 1 - tau * args.c
-        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} Starting point {initial_points_before_disc} ====================\n")
+        print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} Starting point {initial_points_before_disc} epsilon {epsilon} ====================\n")
 
     # Create result directory
     result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{final_time}_sigma_{sigma_value}"
@@ -394,7 +396,7 @@ def run_experiment_configuration(
     # Run discrete simulations
     res_disc = run_discrete_simulations(
         poly, args.optimizer, regime_funcs, noise, tau, beta, args.c, num_steps, 
-        initial_points_before_disc, args.skip_initial_point, args.epsilon, args.num_runs, args.batch_size,
+        initial_points_before_disc, args.skip_initial_point, epsilon, args.num_runs, args.batch_size,
         dim_weights, args.seed_disc, args.verbose
     )
     initial_points = res_disc['initial_point'].to(args.device)
@@ -404,7 +406,7 @@ def run_experiment_configuration(
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
             args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
-            args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_1st, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_1st, args.device, args.verbose
         )
 
     # Run 2nd order SDE simulations
@@ -412,7 +414,7 @@ def run_experiment_configuration(
         res_2_order = run_sde_simulations(
             poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
-            args.num_runs, args.batch_size, args.epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
         )
     
     t1 = time.time()
@@ -452,7 +454,7 @@ def run_experiment_configuration(
         config = vars(args).copy()
         config.update({'initial point bf disc' : initial_points_before_disc.item()})
         wandb.init(
-            project='Poly2',
+            project='Poly',
             name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
             config=config,
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
@@ -543,7 +545,7 @@ Batch equivalent:
 python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
 python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
 
-Balistic
+Balistic:
 python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1; 
 python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
 
