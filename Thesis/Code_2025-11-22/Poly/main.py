@@ -339,7 +339,7 @@ def run_experiment_configuration(
     points: list,
     final_time: float,
     initial_points_before_disc: torch.Tensor = None,
-    epsilon: float = args.epsilon
+    epsilon: float = 0.1
 ) -> None:
     """
     Run a complete experiment configuration for given hyperparameters.
@@ -425,7 +425,7 @@ def run_experiment_configuration(
         'c': args.c,
         'sigma': sigma_value,
         'Simulation_batch_size': None,
-        'epsilon': args.epsilon,
+        'epsilon': epsilon,
         'regime': args.regime,
         'optimizer': args.optimizer,
         'total_time_elapsed': t1 - t0,
@@ -530,7 +530,7 @@ def main():
             else:
                 final_time = args.final_time
             run_experiment_configuration(
-                args, tau, args.sigma, args.points, final_time=final_time, initial_points_before_disc=initial_points_before_disc
+                args, tau, args.sigma, args.points, final_time=final_time, initial_points_before_disc=initial_points_before_disc, epsilon = args.epsilon
             )
     
     print("All experiments completed successfully!")

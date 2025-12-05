@@ -380,7 +380,8 @@ def run_experiment_configuration(
     X_train: torch.Tensor,
     X_val: torch.Tensor,
     y_train: torch.Tensor,
-    y_val: torch.Tensor
+    y_val: torch.Tensor,
+    epsilon: float = 0.1
 ) -> None:
     """
     Run a complete experiment configuration for given hyperparameters.
@@ -394,7 +395,6 @@ def run_experiment_configuration(
         regime_name = 'Balistic'
     elif args.regime == 'batch_equivalent':
         regime_name = 'BatchEq'
-        epsilon = args.epsilon / tau  
 
     if args.optimizer == 'Adam':
         args.c = (args.c_1, args.c_2)
@@ -466,7 +466,7 @@ def run_experiment_configuration(
         'tau': tau,
         'c': args.c,
         'sigma': sigma_value,
-        'epsilon': args.epsilon,
+        'epsilon': epsilon,
         'regime': args.regime,
         'optimizer': args.optimizer,
         'total_time_elapsed': t1 - t0,
@@ -559,7 +559,7 @@ def main():
     for tau in args.tau_list:
         for sigma_value in args.sigma_list:
             run_experiment_configuration(
-                args, tau, sigma_value, X_train, X_val, y_train, y_val
+                args, tau, sigma_value, X_train, X_val, y_train, y_val, epsilon = args.epsilon
             )
     
     print("All experiments completed successfully!")
