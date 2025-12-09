@@ -192,7 +192,7 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         # path_v[:, step+1] = beta * v + lr**2 * c * torch.pow(expected_grad, 2) + lr * c * noise**2 + 2 * lr**(3/2) * c  * noise * expected_grad
         # path_x[:, step+1] = x - lr * expected_grad / (torch.sqrt(path_v[:, step]) + epsilon) - torch.sqrt(lr) * noise / (torch.sqrt(path_v[:, step]) + epsilon) 
 
-        if (verbose and tau * step > temp) or True:
+        if verbose and tau * step > temp:
             temp += 1
             print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, tau {tau}, epsilon {epsilon}')
     if loss_bool:
