@@ -16,7 +16,7 @@ import math
 
 
 from Poly.Utils import set_seed, processing_outputs
-from Poly.poly import Poly2 
+from Poly.poly import Poly2, Poly2_high_noise
 from Algorithms.Utils import get_regime_functions, get_batch_size, get_sigma
 from Poly.Plot_poly import plot_poly_result
 
@@ -33,28 +33,29 @@ def parse_arguments() -> argparse.Namespace:
     # Function parameters
     func_group = parser.add_argument_group('Function Configuration')
     func_group.add_argument('--points', type=float, nargs='+', default=[-1.0, 2.0, 0.5, 1], help='(x, y) points for Hermite Quintic Polynomial: x1 y1 x2 y2 xM yM')
+    func_group.add_argument('--which_poly', type=str, choices = ['Normal', 'HighNoise'], default='HighNoise', help='Which polynomial function to use (Poly2 or Poly2_high_noise)')
 
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
     # [2.5, 0.5, 0.1,  -0.1, -0.4, -1.3, -1.5]
-    train_group.add_argument('--initial_points', type=float, nargs='+', default=[2.5], help='Initial points for optimization')
-    train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.05], help='Learning rate values to test')
+    train_group.add_argument('--initial_points', type=float, nargs='+', default=[2.5, 0.1, -0.1, -1.5], help='Initial points for optimization')
+    train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.001], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma', type=float, default=-1, help='Noise variance values to test')
     train_group.add_argument('--batch-size-simulation', type = int, default=-1, help='Batch size for simulations')
-    train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=1.0, help='Final time for SDE integration')
+    train_group.add_argument('--num-runs', type=int, default=512, help='Number of simulation runs for averaging')
+    train_group.add_argument('--final-time', type=float, default=15.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=1024, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=512, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='batch_equivalent', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=[], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -107,7 +108,8 @@ def run_sde_simulations(
     runs = torch.zeros(num_batched_runs, batch_size, num_steps, dim_result) 
 
     if which_approximation == 'approx_2_fun':
-        dt = tau**2
+        # dt = tau**2
+        dt = tau 
     elif which_approximation == 'approx_1_fun':
         dt = tau
 
@@ -368,7 +370,10 @@ def run_experiment_configuration(
     os.makedirs(result_dir, exist_ok=True)
     
     # Create function
-    poly = Poly2(*points)
+    if args.which_poly == 'Normal':
+        poly = Poly2(*points)
+    elif args.which_poly == 'HighNoise':
+        poly = Poly2_high_noise(*points)
     
     # Setup time parameters
     num_steps = int(torch.ceil(torch.tensor(final_time / tau)).item())
@@ -453,19 +458,23 @@ def run_experiment_configuration(
     if args.wandb:
         config = vars(args).copy()
         config.update({'initial point bf disc' : initial_points_before_disc.item()})
+        if args.which_poly == 'HighNoise':
+            title = 'HighNoise'
+        else:
+            title = 'Normal'
         wandb.init(
             project='Poly',
-            name=f'{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
+            name=f'{title}_{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
             config=config,
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
             save_code=True
         )
+
         for sim in final_results['simulation keys']:
             artifact = wandb.Artifact(f"final_results_tau_{tau}_sigma_{sigma_value}", type="results")
             artifact.add_file(os.path.join(result_dir, f'results_regime{args.regime}_tau{tau}_c{args.c}.pt'))
             wandb.log_artifact(artifact)
             wandb.log({f"Barplot/time_elapsed_for_{sim}": final_results[sim]['time_elapsed'], 'runs': effective_runs})
-
             ts = final_results[sim]['time_steps'].numpy()
             for t in range(len(ts)):
                 theta_val = final_results[sim]['theta_mean'][t].item()
@@ -476,6 +485,7 @@ def run_experiment_configuration(
                     f"v_{sim}": v_val,
                     "time": ts[t]
                 })
+
 
             final_distribution = final_results[sim]['final_distribution'].cpu().numpy().flatten()
             positive = (final_distribution >= 0).sum()
@@ -525,10 +535,7 @@ def main():
 
         for initial_point in args.initial_points:
             initial_points_before_disc = torch.tensor([initial_point])
-            if torch.abs(initial_points_before_disc) < 0.3:
-                final_time = args.final_time * 20
-            else:
-                final_time = args.final_time
+            final_time = args.final_time
             run_experiment_configuration(
                 args, tau, args.sigma, args.points, final_time=final_time, initial_points_before_disc=initial_points_before_disc, epsilon = args.epsilon
             )
@@ -542,16 +549,25 @@ if __name__ == "__main__":
 
 """
 Batch equivalent:
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10;
 
 Balistic:
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1; 
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10; 
+python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --which_poly Normal; 
+python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --which_poly Normal;
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --which_poly Normal; 
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --which_poly Normal; 
 
-python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1; 
-python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10; 
+python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --which_poly Normal; 
+python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --which_poly Normal; 
 
+
+
+python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --which_poly HighNoise --initial_points -1.5; 
+python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --which_poly HighNoise;
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --which_poly HighNoise; 
+python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --which_poly HighNoise; 
+
+python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --which_poly HighNoise; 
+python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --which_poly HighNoise; 
 
 # Da fare
 python -m Poly.main --regime balistic --optimizer RMSProp --sigma 1 --batch-size-simulation -1; 

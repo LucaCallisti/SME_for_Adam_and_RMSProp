@@ -33,7 +33,7 @@ class RMSprop_SDE_2order_balistic_regime(SDE_basic):
         self.verbose = Verbose
         self.final_time = All_time[-1]
         self.All_time = All_time
-        self.temp = 0
+        self.t_nan, self.t_verbose = 0, 0
         self.regularizer = regularizer
     
     def f(self, t, x):
@@ -178,7 +178,9 @@ def Discrete_RMProp_balistic_regime(funz, noise, tau, beta, c, num_steps, x_0, s
     
     temp = 0
     temp1 = 0
+    start = time.time()
     for step in range(num_steps-1):
+
         if step % max_lenghth_gamma_list == 0:            
             indices = torch.randint(0, noise_shuffled.shape[0], (batch_size, max_lenghth_gamma_list))
             gamma_list = noise_shuffled[indices].to(x_0.device)
@@ -199,6 +201,10 @@ def Discrete_RMProp_balistic_regime(funz, noise, tau, beta, c, num_steps, x_0, s
 
         path_v[:, step+1] = (1 - c * tau) * v + c * tau * grad**2
         path_x[:, step+1] = x - tau * grad / (torch.sqrt(v) + epsilon)
+
+        if step % 10000 == 0:
+            print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
+            start = time.time()
 
         if verbose and tau * step > temp:
             temp += 1

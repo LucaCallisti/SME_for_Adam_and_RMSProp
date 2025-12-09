@@ -32,7 +32,7 @@ class Adam_SDE_2order_batch_equivalent_regime(SDE_basic):
         self.verbose = Verbose
         self.final_time = All_time[-1]
         self.All_time = All_time
-        self.temp = 0
+        self.t_nan, self.t_verbose = 0, 0
         self.regularizer = regularizer
     
     def f(self, t, x):
@@ -175,7 +175,7 @@ class Adam_SDE_1order_batch_equivalent_regime(Adam_SDE_2order_batch_equivalent_r
     def Gamma(self, t):
         return torch.sqrt(self.gamma_2(t))/self.gamma_1(t) 
 
-def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x_0, skip, epsilon = 1e-6, verbose = False, loss_bool = True):
+def Discrete_Adam_batch_equivalent_regime(funz, noise, tau, beta, c, num_steps, x_0, skip, epsilon = 1e-6, verbose = False, loss_bool = True):
     beta_1, beta_2 = beta
     c_1, c_2 = c
 
@@ -189,13 +189,13 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
     path_v[:, 0, :] = torch.ones_like(x_0)
     path_m[:, 0, :] = torch.zeros_like(x_0)
 
-    lr = torch.tensor(lr)
+    tau = torch.tensor(tau)
     temp = 0
     max_lenghth_gamma_list = 1000
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
 
     print('Starting point:', path_x[:,0,:].mean().item())
-
+    start = time.time()
     for step in range(num_steps-1):
 
         if step % max_lenghth_gamma_list == 0:            
@@ -214,18 +214,22 @@ def Discrete_Adam_batch_equivalent_regime(funz, noise, lr, beta, c, num_steps, x
         m = path_m[:, step]
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
-        grad = funz.noisy_grad_batcheq(x, gamma, lr)
+        grad = funz.noisy_grad_batcheq(x, gamma, tau)
 
         gamma_1 = 1-beta_1**(step+2) * torch.ones_like(v)
         sqrt_gamma_2 = torch.sqrt(torch.tensor(1-beta_2**(step+1) )) * torch.ones_like(v)
 
-        path_v[:, step+1] = beta_2 * v + lr**2 * c_2 * torch.pow(grad, 2)
-        path_m[:, step+1] = beta_1 * m + lr * c_1 * grad
-        path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
+        path_v[:, step+1] = beta_2 * v + tau**2 * c_2 * torch.pow(grad, 2)
+        path_m[:, step+1] = beta_1 * m + tau * c_1 * grad
+        path_x[:, step+1] = x - tau * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])  
         
-        if verbose and step*lr >= temp:
+        if step % 10000 == 0:
+            print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
+            start = time.time()
+
+        if verbose and step*tau >= temp:
             temp += 1
-            print(f'Time: {step*lr:.2f}, x mean: {path_x[:,step+1,:].mean().item():.4f}, v mean: {v.mean().item():.4f}, grad mean: {grad.mean().item():.4f}, m mean: {path_m[:, step+1].mean().item():.4f}, gamma1: {gamma_1.mean().item():.4f}, sqrt_gamma2: {sqrt_gamma_2.mean().item():.4f}')
+            print(f'Time: {step*tau:.2f}, x mean: {path_x[:,step+1,:].mean().item():.4f}, v mean: {v.mean().item():.4f}, grad mean: {grad.mean().item():.4f}, m mean: {path_m[:, step+1].mean().item():.4f}, gamma1: {gamma_1.mean().item():.4f}, sqrt_gamma2: {sqrt_gamma_2.mean().item():.4f}')
 
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])

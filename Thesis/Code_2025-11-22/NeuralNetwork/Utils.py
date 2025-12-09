@@ -2,7 +2,7 @@ import os
 import random
 import numpy as np
 import torch
-from sklearn.datasets import fetch_california_housing
+from sklearn.datasets import fetch_california_housing, load_breast_cancer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from typing import Tuple, Dict, Any, Optional
@@ -40,7 +40,7 @@ def norm_and_mean(tensor: torch.Tensor) -> torch.Tensor:
 
 
 
-def load_and_preprocess_data(test_size: float = 0.2, random_state: int = 42) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def load_and_preprocess_data(dataset, test_size: float = 0.2, random_state: int = 42) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Load and preprocess the California Housing dataset.
     
@@ -54,7 +54,12 @@ def load_and_preprocess_data(test_size: float = 0.2, random_state: int = 42) -> 
     print("Loading and preprocessing California Housing dataset...")
     
     # Load dataset
-    data = fetch_california_housing()
+    if dataset == 'Housing':
+        data = fetch_california_housing()
+    elif dataset == 'BreastCancer':
+        data = load_breast_cancer()
+    else:
+        raise ValueError(f"Unknown dataset: {dataset}")
     X = data['data']
     y = data['target'].reshape(-1, 1)
     

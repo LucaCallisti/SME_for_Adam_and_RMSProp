@@ -2,50 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict
+from NeuralNetwork.Utils import load_and_preprocess_data
 
-class ShallowNN:
-    """
-    Usa torch.func per vettorializzare automaticamente il forward pass.
-    Funziona con reti complesse senza modifiche.
-    """
 
-    def __init__(self, input_dim, mid_dim, output_dim, dataset, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
-        self.input_dim = input_dim
-        self.mid_dim = mid_dim
-        self.A = nn.Linear(input_dim, mid_dim, bias=False).to(device)
-        self.B = nn.Linear(mid_dim, output_dim).to(device)
-
-        self.initial_weights = torch.cat([
-            self.A.weight.flatten(),
-            self.B.weight.flatten(),
-            self.B.bias.flatten()
-        ])
-        self.network = nn.Sequential(self.A,
-                              nn.ReLU(),
-                              self.B).to(device)
-        self.device = device
-
-        # Calcola total_params e estrai param shapes
-        self.param_shapes = []
-        self.param_sizes = []
-        self.total_params = 0
-
-        for name, param in self.network.named_parameters():
-            shape = param.shape
-            size = param.numel()
-            self.param_shapes.append((name, shape))
-            self.param_sizes.append(size)
-            self.total_params += size
-
-        self.x_input = dataset.X.to(device)
-        self.y_target = dataset.y.to(device)
-
-        self.x_val = dataset.X_val.to(device)
-        self.y_val = dataset.y_val.to(device)
-
-        self.grad_batch = None
-        self.loss_batch_cached = None
-
+class base_nn:
     def forward_batch(self, x: torch.Tensor, theta_batch: torch.Tensor) -> torch.Tensor:
         """
         Applica la rete con batch di parametri usando torch.func.
@@ -203,63 +163,112 @@ class ShallowNN:
         return params_dict
 
 
-# Esempio di utilizzo
-if __name__ == "__main__":
-    torch.manual_seed(42)
-    input_dim = 3
-    output_dim = 1
-    N = 5  # numero di esempi
-    X = torch.randn(N, input_dim)  # shape (N, input_dim)
-    Y = torch.randn(N, output_dim) # shape (N, output_dim)
 
-    mid_dim = 3
-    # Crea un dataset wrapper semplice
-    class SimpleDataset:
-        def __init__(self, X, y):
-            self.X = X
-            self.y = y
-    
-    dataset = SimpleDataset(X, Y)
+class ShallowNN(base_nn):
+    """
+    Usa torch.func per vettorializzare automaticamente il forward pass.
+    Funziona con reti complesse senza modifiche.
+    """
 
-    model = SimpleNN(input_dim, mid_dim, output_dim, dataset, device='cpu')
-    params = model.get_weights()
-    Y_pred = model(X)
-    loss = model.loss(X, Y)
-    print("Loss MSE:", loss.item())
+    def __init__(self, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+        # Creating datasets
+        X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = 'Housing', test_size = 0.2)
+        self.x_input = X_train.to(device)
+        self.y_target = y_train.to(device)
 
-    # Gradienti autograd concatenati (metodo classico)
-    grad_vector = model.autograd_vector()
-    print("\nVettore gradiente autograd (classico):")
-    print(grad_vector)
+        self.x_val = X_val.to(device)
+        self.y_val = y_val.to(device)
+        
+        # Inizializing layers
+        self.input_dim = X_train.shape[1]
+        self.A = nn.Linear(self.input_dim, 3, bias=False).to(device)
+        self.B = nn.Linear(3, 1).to(device)
 
-    # Hessiano
-    hess = model.hessian_matrix()
-    print("\nHessiano:")
-    print(hess)
+        self.initial_weights = torch.cat([
+            self.A.weight.flatten(),
+            self.B.weight.flatten(),
+            self.B.bias.flatten()
+        ])
+        self.network = nn.Sequential(self.A,
+                              nn.ReLU(),
+                              self.B).to(device)
+        self.device = device
 
-    print("\n" + "=" * 60)
-    print("VMAPPED PARAMETER NETWORK EXAMPLE")
-    print("=" * 60)
-    
-    
-    vmapped_model = VmappedParameterNetwork(input_dim, mid_dim, output_dim, dataset, device=args.device)    
-    theta_batch = params.unsqueeze(0).expand(4, -1).clone() 
-    
-    
-    # Esempio 2: Calcolo gradienti per un batch di parametri
-    print("-" * 60)
-    print("ESEMPIO 2: Gradienti per batch di parametri")
-    print("-" * 60)
-    grad_batch = vmapped_model.autograd_vector_batch(theta_batch)
-    print(f"Gradient batch shape: {grad_batch.shape}")
-    print(f"Gradient batch:\n{grad_batch}\n")
+        # Calculating parameter shapes and sizes for unpacking
+        self.param_shapes = []
+        self.param_sizes = []
+        self.total_params = 0
 
-    # Step 3: Calcola Hessiano ESATTO completo
-    print("-" * 60)
-    print("STEP 3: Hessiano ESATTO completo batch-wise")
-    print("-" * 60)
-    hessian_batch = vmapped_model.hessian_matrix_batch(theta_batch)
-    print(f"Hessian batch shape: {hessian_batch.shape}")
-    print(f"Hessian:\n{hessian_batch}")
+        for name, param in self.network.named_parameters():
+            shape = param.shape
+            size = param.numel()
+            self.param_shapes.append((name, shape))
+            self.param_sizes.append(size)
+            self.total_params += size
+
+        self.grad_batch = None
+        self.loss_batch_cached = None
+
+
+
+class MLP(base_nn):
+    """
+    Usa torch.func per vettorializzare automaticamente il forward pass.
+    Funziona con reti complesse senza modifiche.
+    """
+
+    def __init__(self, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+         # Creating datasets
+        X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = 'BreastCancer', test_size = 0.2)
+        self.x_input = X_train.to(device)
+        self.y_target = y_train.to(device)
+
+        self.x_val = X_val.to(device)
+        self.y_val = y_val.to(device)
+        
+        # Inizializing layers
+        self.input_dim = X_train.shape[1]
+        self.layer1 = nn.Linear(self.input_dim, 16).to(device)
+        self.layer2 = nn.Linear(16, 8).to(device)
+        self.layer3 = nn.Linear(8, 4).to(device)
+        self.layer4 = nn.Linear(4, 1).to(device)
+
+        self.initial_weights = torch.cat([
+            self.layer1.weight.flatten(), self.layer1.bias.flatten(),
+            self.layer2.weight.flatten(), self.layer2.bias.flatten(),
+            self.layer3.weight.flatten(), self.layer3.bias.flatten(),
+            self.layer4.weight.flatten(), self.layer4.bias.flatten()
+        ])
+        self.network = nn.Sequential(
+            self.layer1,
+            nn.GELU(),
+            self.layer2,
+            nn.GELU(),       
+            self.layer3,
+            nn.GELU(),
+            self.layer4,
+            nn.Sigmoid()     
+        ).to(device)
+        
+        self.device = device
+
+        # Calculating parameter shapes and sizes for unpacking
+        self.param_shapes = []
+        self.param_sizes = []
+        self.total_params = 0
+
+        for name, param in self.network.named_parameters():
+            shape = param.shape
+            size = param.numel()
+            self.param_shapes.append((name, shape))
+            self.param_sizes.append(size)
+            self.total_params += size
+
+        self.grad_batch = None
+        self.loss_batch_cached = None
+
     
+
+
+
 

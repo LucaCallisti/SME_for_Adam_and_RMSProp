@@ -1,10 +1,12 @@
 import math
 import torch
-
-
+from torch.func import grad, vmap
 
 
 class base_poly:
+    '''
+    Base class for functions defined as f(x) = 1/2 * ( f_1 (x) + f_2 (x) ).
+    '''
     def noisy_grad_balistic(self, x, gamma):
         f1_vals = self.f1_prime(x)
         f2_vals = self.f2_prime(x)
@@ -50,73 +52,6 @@ class base_poly:
         return self.hessian_sigma(x).squeeze(-1)
 
 
-class aux_function_poly_Wshaped:
-    def __init__(self, y1, y2, constant_term, multiplicative_factor = 1):
-        self.y1 = torch.tensor(y1)
-        self.y2 = torch.tensor(y2)
-        self.constant_term = torch.tensor(constant_term)
-        self.multiplicative_factor = torch.tensor(multiplicative_factor)
-
-    def f(self, x):
-        return self.multiplicative_factor * (x - self.y1)**2 * (x - self.y2)**2 + self.constant_term
-
-    def f_prime(self, x):
-        term1 = x - self.y1
-        term2 = x - self.y2
-        return 2 * self.multiplicative_factor * ( term1**2 * term2 + term2**2 * term1 )
-
-    def f_second(self, x):
-        term1 = x - self.y1
-        term2 = x - self.y2
-        return 2 * self.multiplicative_factor * ( term1**2 + term2**2 + 4 * term1 * term2 )
-    
-    def f_third(self, x):
-        term1 = x - self.y1
-        term2 = x - self.y2
-        return 12 * self.multiplicative_factor * ( term1 + term2 )        
-    
-
-class function_poly_Wshaped(base_poly):
-    def __init__(self, x1, x2, delta, m = 1):
-        '''
-        The function is defined as: f_1 (x) = m*(x- (x1-delta) )^2 * (x- (x1-delta) )^2,  f_2 (x) = m*(x- (x1+delta) )^2 * (x- (x2+delta) )^2
-        and f(x) = 0.5 * m * ( f_1 (x) + f_2 (x) )
-        '''
-        assert x1**2 + x2**2 > 4*(x1*x2 + 3*delta**2), "The chosen parameters do not ensure the presence of four minimas."
-        self.coeff_1 = (x1 - delta, x2 - delta, 0) 
-        self.coeff_2 = (x1 + delta, x2 + delta, 0)
-        sqrt_value = math.sqrt( (x1 + x2)**2 - 4*(x1*x2 + 3*delta**2) )
-        self.coeff = (0.5 * (x1 + x2 - sqrt_value), 0.5 * (x1 + x2 + sqrt_value), delta**2 * ( (x1 + x2)**2 -6*x1*x2 ) - 8 * delta**4)
-
-        self._f = aux_function_poly_Wshaped( self.coeff[0], self.coeff[1], self.coeff[2], multiplicative_factor = m )
-        self._f1 = aux_function_poly_Wshaped( self.coeff_1[0], self.coeff_1[1], self.coeff_1[2], multiplicative_factor = m )
-        self._f2 = aux_function_poly_Wshaped( self.coeff_2[0], self.coeff_2[1], self.coeff_2[2], multiplicative_factor = m )
-
-    def f(self, x):
-        return self._f.f(x)
-    def f_prime(self, x):
-        return self._f.f_prime(x)
-    def f_second(self, x):
-        return self._f.f_second(x)
-    def f_third(self, x):
-        return self._f.f_third(x)
-    def f1(self, x):
-        return self._f1.f(x)
-    def f1_prime(self, x):
-        return self._f1.f_prime(x)
-    def f1_second(self, x):
-        return self._f1.f_second(x)
-    def f2(self, x):
-        return self._f2.f(x)
-    def f2_prime(self, x):
-        return self._f2.f_prime(x)
-    def f2_second(self, x):
-        return self._f2.f_second(x)
-    def f1_third(self, x):
-        return self._f1.f_third(x)
-    def f2_third(self, x):
-        return self._f2.f_third(x)
-
 
 
 class Poly2(base_poly):
@@ -138,6 +73,72 @@ class Poly2(base_poly):
         self._f2_prime = lambda x: 4 * d * x
         self._f2_second = lambda x: 4 * d * torch.ones_like(x)
         self._f2_third = lambda x: torch.zeros_like(x)
+
+        self._f = lambda x: 0.5 * ( self._f1(x) + self._f2(x) )
+        self._f_prime = lambda x: 0.5 * ( self._f1_prime(x) + self._f2_prime(x) )
+        self._f_second = lambda x: 0.5 * ( self._f1_second(x) + self._f2_second(x) )
+        self._f_third = lambda x: 0.5 * ( self._f1_third(x) + self._f2_third(x) )
+        
+    def f(self, x):
+        return self._f(x)
+    def f_prime(self, x):
+        return self._f_prime(x)
+    def f_second(self, x):
+        return self._f_second(x)
+    def f_third(self, x):
+        return self._f_third(x)
+    def f1(self, x):
+        return self._f1(x)
+    def f1_prime(self, x):
+        return self._f1_prime(x)
+    def f1_second(self, x):
+        return self._f1_second(x)
+    def f1_third(self, x):
+        return self._f1_third(x)
+    def f2(self, x):
+        return self._f2(x)
+    def f2_prime(self, x):
+        return self._f2_prime(x)
+    def f2_second(self, x):
+        return self._f2_second(x)
+    def f2_third(self, x):
+        return self._f2_third(x)
+    
+
+class Poly2_high_noise(base_poly):
+    def __init__(self, x1, x2, c, d):
+        '''
+        The function is defined as: f_1 (x) = 2 * c*(x- x1 )^2 * (x- x2 )^2,  f_2 (x) =   2 * d * x^2
+        and f(x) = 0.5 * ( f_1 (x) + f_2 (x) )
+        '''
+
+        self.x_liminf = -1.5
+        self.x_limsup = 3
+
+        self.f1_old = lambda x: 2 * c * (x-x1)**2 * (x - x2)**4
+        self.f1_prime_old = lambda x: 2 * c * ( 2*(x - x1) * (x - x2)**4 + 4*(x - x2)**3 * (x - x1)**2 )
+        self.f1_second_old = lambda x: 2 * c * ( 2*(x - x2)**4 + 8*(x - x1)*(x - x2)**3 + 12*(x - x2)**2 * (x - x1)**2 + 8*(x - x2)**3 * (x - x1) )
+        self.f1_third_old =  lambda x: 2 * c * ( 8*(x - x2)**3 + 8*(x - x2) + 24*(x - x1)*(x - x2)**2 + 24*(x - x2)*(x - x1)**2 + 24*(x - x1)*(x - x2)**2 + 8*(x - x2)**3 + 24*(x - x2)**2 * (x - x1) )
+
+        self.f2_old = lambda x: 2 * d * x**2
+        self.f2_prime_old = lambda x: 4 * d * x
+        self.f2_second_old = lambda x: 4 * d * torch.ones_like(x)
+        self.f2_third_old = lambda x: torch.zeros_like(x)
+
+        cost = 0.25
+        self.g = lambda x : cost * (self.f1_old(x) - self.f2_old(x))
+        self.g_prime = lambda x : cost * (self.f1_prime_old(x) - self.f2_prime_old(x))
+        self.g_second = lambda x : cost * (self.f1_second_old(x) - self.f2_second_old(x))
+        self.g_third = lambda x : cost * (self.f1_third_old(x) - self.f2_third_old(x))
+
+        self._f1 = lambda x : self.f1_old(x) + self.g(x)
+        self._f1_prime = lambda x : self.f1_prime_old(x) + self.g_prime(x)
+        self._f1_second = lambda x : self.f1_second_old(x) + self.g_second(x)
+        self._f1_third = lambda x : self.f1_third_old(x) + self.g_third(x)
+        self._f2 = lambda x : self.f2_old(x) - self.g(x)
+        self._f2_prime = lambda x : self.f2_prime_old(x) - self.g_prime(x)
+        self._f2_second = lambda x : self.f2_second_old(x) - self.g_second(x)
+        self._f2_third = lambda x : self.f2_third_old(x) - self.g_third(x)
 
         self._f = lambda x: 0.5 * ( self._f1(x) + self._f2(x) )
         self._f_prime = lambda x: 0.5 * ( self._f1_prime(x) + self._f2_prime(x) )

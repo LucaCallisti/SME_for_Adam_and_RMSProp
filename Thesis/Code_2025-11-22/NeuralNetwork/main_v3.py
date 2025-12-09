@@ -14,8 +14,8 @@ import wandb
 import math
 
 from Algorithms.Utils import get_regime_functions
-from NeuralNetwork.Utils import set_seed, norm_and_mean, load_and_preprocess_data
-from NeuralNetwork.Dnn import ShallowNN
+from NeuralNetwork.Utils import set_seed, norm_and_mean
+from NeuralNetwork.Dnn import ShallowNN, MLP
 
 import sys
 sys.setrecursionlimit(10000)
@@ -31,9 +31,7 @@ def parse_arguments() -> argparse.Namespace:
     
     # Model parameters
     model_group = parser.add_argument_group('Model Configuration')
-    model_group.add_argument('--input-dim', type=int, default=None, help='Input dimension (auto-detected from dataset if None)')
-    model_group.add_argument('--mid-dim', type=int, default=3, help='Hidden layer dimension')
-    model_group.add_argument('--output-dim', type=int, default=1, help='Output dimension')
+    model_group.add_argument('--model', type=str, choices=['ShallowNN', 'MLP'], default='MLP', help='Neural network model to use')
     
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
@@ -42,17 +40,17 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=512, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=400.0, help='Final time for SDE integration')
+    train_group.add_argument('--num-runs', type=int, default=32, help='Number of simulation runs for averaging')
+    train_group.add_argument('--final-time', type=float, default=200.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=512, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=16, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['2nd_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -375,12 +373,9 @@ def _run_1st_order_balistic(
 
 def run_experiment_configuration(
     args: argparse.Namespace,
+    model_factory: callable,
     tau: float,
     sigma_value: float,
-    X_train: torch.Tensor,
-    X_val: torch.Tensor,
-    y_train: torch.Tensor,
-    y_val: torch.Tensor,
     epsilon: float = 0.1
 ) -> None:
     """
@@ -409,16 +404,9 @@ def run_experiment_configuration(
     result_dir = os.path.join(result_dir, args.regime.replace(' ', '_'))
     os.makedirs(result_dir, exist_ok=True)
     
-    # Setup model factory
-    dataset = type('Dataset', (object,), {'X': X_train, 'y': y_train, 'X_val': X_val, 'y_val': y_val})()
-    input_dim = args.input_dim or X_train.shape[1]
-    
-    def model_factory():
-        return ShallowNN(input_dim, args.mid_dim, args.output_dim, dataset, device=args.device)    
-    
     # Get initial parameters
     set_seed(args.seed_parameters)
-    initial_model = ShallowNN(input_dim, args.mid_dim, args.output_dim, dataset, args.device)
+    initial_model = model_factory()
     initial_params = initial_model.initial_weights
     dim_weights = initial_params.shape[0]
     
@@ -492,7 +480,7 @@ def run_experiment_configuration(
     if args.wandb:
         for sim in final_results['simulation keys']:
             wandb.init(
-                project='ShallowNN-CaliforniaHousing-RMSProp_',
+                project=f'{args.model}',
                 name=f'{args.optimizer}_{regime_name}_{sim}_tau_{tau}_c_{args.c}_sigma_{sigma_value}_nruns_{effective_runs}',
                 config=vars(args),
                 notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
@@ -509,7 +497,7 @@ def run_experiment_configuration(
                 val_loss_val = final_results[sim]['Val_loss'][t].item()
                 theta_mean = final_results[sim]['theta_mean'][t].item()
                 v_mean = final_results[sim]['v_mean'][t].item()
-                
+                print(loss_val, val_loss_val, theta_mean, v_mean, ts[t])
                 wandb.log({
                     f"Loss": loss_val,
                     f"Val_loss": val_loss_val,
@@ -551,15 +539,20 @@ def main():
     print(f"Parameters: tau={args.tau_list}, c={args.c}, sigma={args.sigma_list}")
     print(f"Number of runs: {args.num_runs}")
     
-    # Load and preprocess data
-    X_train, X_val, y_train, y_val = load_and_preprocess_data(args.test_size, args.random_state)
-    
-    
+    if args.model == 'ShallowNN':
+        def model_factory():
+            return ShallowNN()
+    elif args.model == 'MLP':
+        def model_factory():
+            return MLP()
+    else:
+        raise ValueError(f"Unknown model type: {args.model}")
+
     # Run experiments for all parameter combinations
     for tau in args.tau_list:
         for sigma_value in args.sigma_list:
             run_experiment_configuration(
-                args, tau, sigma_value, X_train, X_val, y_train, y_val, epsilon = args.epsilon
+                args, model_factory, tau, sigma_value, epsilon = args.epsilon
             )
     
     print("All experiments completed successfully!")

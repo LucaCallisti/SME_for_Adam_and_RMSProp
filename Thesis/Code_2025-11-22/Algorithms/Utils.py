@@ -59,8 +59,9 @@ class SDE_basic(torchsde.SDEIto):
 
 
     def is_it_Nan(self, input, x, t, where):
-        if torch.isnan(input).any():
+        if torch.isnan(input).any() and t > self.t_nan:
             print(f"Warning: {torch.isnan(input).sum()} NaN values detected in {where}")
+            self.t_nan = t + 1
         return False
     def chronometer(self, t):
         if self.i == 1: self.start_new_f = time.time()
@@ -70,10 +71,11 @@ class SDE_basic(torchsde.SDEIto):
                 self.start_new_f = time.time()
         self.i += 1
     def Verbose(self, t):
-        if self.verbose and t>self.temp: 
+
+        if self.verbose and t > self.t_verbose: 
             self.chronometer(t)
             print(f't: {t:.1f}', end='\r')
-            self.temp += 1
+            self.t_verbose = t + 1
             # print(f't: {t:.1f}, theta {self.theta[154].item()}, v {self.v[154].item()}, m {self.m[154].item()},drift {self.drift[154]}, self.diag_Sigma {self.diag_Sigma[154].item()}' )
             # self.temp += 0.05 
 

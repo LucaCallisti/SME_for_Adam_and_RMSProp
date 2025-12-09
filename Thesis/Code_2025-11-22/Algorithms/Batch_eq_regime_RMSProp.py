@@ -26,7 +26,7 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
         self.verbose = Verbose
         self.final_time = All_time[-1]
         self.All_time = All_time
-        self.temp = 0
+        self.t_nan, self.t_verbose = 0, 0
         self.regularizer = regularizer
     
     def f(self, t, x):
@@ -164,6 +164,7 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
     max_lenghth_gamma_list = 1000
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
     
+    start = time.time()
     for step in range(num_steps-1):
 
         if step % max_lenghth_gamma_list == 0:            
@@ -192,9 +193,13 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         # path_v[:, step+1] = beta * v + lr**2 * c * torch.pow(expected_grad, 2) + lr * c * noise**2 + 2 * lr**(3/2) * c  * noise * expected_grad
         # path_x[:, step+1] = x - lr * expected_grad / (torch.sqrt(path_v[:, step]) + epsilon) - torch.sqrt(lr) * noise / (torch.sqrt(path_v[:, step]) + epsilon) 
 
-        if verbose and tau * step > temp:
+        if step % 10000 == 0:
+            print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
+            start = time.time()
+
+        if (verbose and tau * step > temp):
             temp += 1
-            print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, tau {tau}, epsilon {epsilon}')
+            print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, Delta x { (tau * grad / (torch.sqrt(v) + epsilon)).mean().item():.4f}, epsilon {epsilon}')
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
         return torch.concat((path_x, path_v), dim = 2), Loss_values

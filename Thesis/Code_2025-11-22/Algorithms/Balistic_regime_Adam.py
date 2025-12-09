@@ -32,7 +32,7 @@ class Adam_SDE_2order_balistic_regime(SDE_basic):
         self.verbose = Verbose
         self.final_time = All_time[-1]
         self.All_time = All_time
-        self.temp = 0
+        self.t_nan, self.t_verbose = 0, 0
         self.regularizer = regularizer
     
     def f(self, t, x):
@@ -181,7 +181,7 @@ class Adam_deterministic(Adam_SDE_2order_balistic_regime):
         self.diffusion = torch.zeros(x.shape[0], x.shape[1], x.shape[1], device=x.device)  
         return self.diffusion
     
-def Discrete_Adam_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, skip, epsilon = 1e-6, verbose = False, loss_bool = True):
+def Discrete_Adam_balistic_regime(funz, noise, tau, beta, c, num_steps, x_0, skip, epsilon = 1e-6, verbose = False, loss_bool = True):
     
     beta_1, beta_2 = beta
     c_1, c_2 = c
@@ -199,7 +199,7 @@ def Discrete_Adam_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, skip
     temp = 0
     max_lenghth_gamma_list = 1000
     noise_shuffled = noise[torch.randperm(noise.shape[0])]
-
+    start = time.time()
     for step in range(num_steps-1):
 
         if step % max_lenghth_gamma_list == 0:            
@@ -225,11 +225,15 @@ def Discrete_Adam_balistic_regime(funz, noise, lr, beta, c, num_steps, x_0, skip
 
         path_v[:, step+1] = beta_2 * v + (1 - beta_2) * grad**2
         path_m[:, step+1] = beta_1 * path_m[:, step] + (1 - beta_1) * grad
-        path_x[:, step+1] = x - lr * sqrt_gamma_2 / ( (torch.sqrt(path_v[:, step]) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])
+        path_x[:, step+1] = x - tau * sqrt_gamma_2 / ( (torch.sqrt(v) + epsilon * sqrt_gamma_2) * gamma_1) * (path_m[:, step+1])
 
-        if verbose and step*lr >= temp:
+        if step % 10000 == 0:
+            print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
+            start = time.time()
+
+        if verbose and step*tau >= temp:
             temp += 1
-            print(f'Time: {step*lr:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, v mean: {path_v[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
+            print(f'Time: {step*tau:.2f}, Current mean position: {path_x[:,step+1,:].mean().item()}, v mean: {path_v[:,step+1,:].mean().item()}, grad mean: {grad.mean().item()}')
     
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])
