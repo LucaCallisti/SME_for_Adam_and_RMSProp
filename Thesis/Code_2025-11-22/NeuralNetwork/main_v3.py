@@ -14,7 +14,7 @@ import wandb
 import math
 
 from Algorithms.Utils import get_regime_functions
-from NeuralNetwork.Utils import set_seed, norm_and_mean
+from NeuralNetwork.Utils import set_seed, norm_and_mean, get_parameters
 from NeuralNetwork.Dnn import ShallowNN, MLP
 
 import sys
@@ -35,13 +35,9 @@ def parse_arguments() -> argparse.Namespace:
     
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
-    train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.1], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
-    train_group.add_argument('--sigma-list', type=float, nargs='+', default=[0.2], help='Noise variance values to test')
-    train_group.add_argument('--num-runs', type=int, default=32, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=200.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
@@ -112,7 +108,8 @@ def run_sde_simulations(
     y0_batched = y0.unsqueeze(0).expand(batch_size, -1).to(device)
 
     if which_approximation == 'approx_2_fun':
-        dt = tau**2
+        # dt = tau**2
+        dt = tau
     elif which_approximation == 'approx_1_fun':
         dt = tau
 
@@ -547,13 +544,15 @@ def main():
             return MLP()
     else:
         raise ValueError(f"Unknown model type: {args.model}")
+    tau, sigma, final_time, num_runs = get_parameters(args.model)
+
+    args.num_runs = num_runs
+    args.final_time = final_time
 
     # Run experiments for all parameter combinations
-    for tau in args.tau_list:
-        for sigma_value in args.sigma_list:
-            run_experiment_configuration(
-                args, model_factory, tau, sigma_value, epsilon = args.epsilon
-            )
+    run_experiment_configuration(
+        args, model_factory, tau, sigma, epsilon = args.epsilon
+    )
     
     print("All experiments completed successfully!")
 

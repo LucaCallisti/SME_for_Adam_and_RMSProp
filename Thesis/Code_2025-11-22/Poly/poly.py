@@ -105,8 +105,8 @@ class Poly2(base_poly):
         return self._f2_third(x)
     
 
-class Poly2_high_noise(base_poly):
-    def __init__(self, x1, x2, c, d):
+class Poly_with_additional_noise(base_poly):
+    def __init__(self, x1, x2, c, d, noise_level=0):
         '''
         The function is defined as: f_1 (x) = 2 * c*(x- x1 )^2 * (x- x2 )^2,  f_2 (x) =   2 * d * x^2
         and f(x) = 0.5 * ( f_1 (x) + f_2 (x) )
@@ -125,20 +125,30 @@ class Poly2_high_noise(base_poly):
         self.f2_second_old = lambda x: 4 * d * torch.ones_like(x)
         self.f2_third_old = lambda x: torch.zeros_like(x)
 
-        cost = 0.25
-        self.g = lambda x : cost * (self.f1_old(x) - self.f2_old(x))
-        self.g_prime = lambda x : cost * (self.f1_prime_old(x) - self.f2_prime_old(x))
-        self.g_second = lambda x : cost * (self.f1_second_old(x) - self.f2_second_old(x))
-        self.g_third = lambda x : cost * (self.f1_third_old(x) - self.f2_third_old(x))
+        if noise_level == 0:
+            self._f1 = self.f1_old
+            self._f1_prime = self.f1_prime_old
+            self._f1_second = self.f1_second_old
+            self._f1_third = self.f1_third_old
+            self._f2 = self.f2_old
+            self._f2_prime = self.f2_prime_old
+            self._f2_second = self.f2_second_old
+            self._f2_third = self.f2_third_old
+        else:
+            cost = noise_level
+            self.g = lambda x : cost * (self.f1_old(x) - self.f2_old(x))
+            self.g_prime = lambda x : cost * (self.f1_prime_old(x) - self.f2_prime_old(x))
+            self.g_second = lambda x : cost * (self.f1_second_old(x) - self.f2_second_old(x))
+            self.g_third = lambda x : cost * (self.f1_third_old(x) - self.f2_third_old(x))
 
-        self._f1 = lambda x : self.f1_old(x) + self.g(x)
-        self._f1_prime = lambda x : self.f1_prime_old(x) + self.g_prime(x)
-        self._f1_second = lambda x : self.f1_second_old(x) + self.g_second(x)
-        self._f1_third = lambda x : self.f1_third_old(x) + self.g_third(x)
-        self._f2 = lambda x : self.f2_old(x) - self.g(x)
-        self._f2_prime = lambda x : self.f2_prime_old(x) - self.g_prime(x)
-        self._f2_second = lambda x : self.f2_second_old(x) - self.g_second(x)
-        self._f2_third = lambda x : self.f2_third_old(x) - self.g_third(x)
+            self._f1 = lambda x : self.f1_old(x) + self.g(x)
+            self._f1_prime = lambda x : self.f1_prime_old(x) + self.g_prime(x)
+            self._f1_second = lambda x : self.f1_second_old(x) + self.g_second(x)
+            self._f1_third = lambda x : self.f1_third_old(x) + self.g_third(x)
+            self._f2 = lambda x : self.f2_old(x) - self.g(x)
+            self._f2_prime = lambda x : self.f2_prime_old(x) - self.g_prime(x)
+            self._f2_second = lambda x : self.f2_second_old(x) - self.g_second(x)
+            self._f2_third = lambda x : self.f2_third_old(x) - self.g_third(x)
 
         self._f = lambda x: 0.5 * ( self._f1(x) + self._f2(x) )
         self._f_prime = lambda x: 0.5 * ( self._f1_prime(x) + self._f2_prime(x) )
