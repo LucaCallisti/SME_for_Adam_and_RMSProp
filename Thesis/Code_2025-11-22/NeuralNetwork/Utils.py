@@ -35,8 +35,9 @@ def norm_and_mean(tensor: torch.Tensor) -> torch.Tensor:
     """
     norm = torch.norm(tensor, dim=2, keepdim=True)
     mean = torch.mean(norm, dim=0)
+    std_dev = torch.std(norm, dim=0)
     final_norm = norm[:, -1, :]
-    return mean, final_norm
+    return mean, std_dev, final_norm
 
 
 

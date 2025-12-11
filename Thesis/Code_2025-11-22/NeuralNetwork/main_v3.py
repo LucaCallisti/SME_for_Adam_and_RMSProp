@@ -141,19 +141,21 @@ def run_sde_simulations(
     val_loss = val_loss.reshape(-1, val_loss.shape[2]).mean(dim=0)
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
     if optimizer == 'Adam':
-        theta, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        m, _ = norm_and_mean(runs[:, :, dim_weights: 2*dim_weights])
-        v, _ = norm_and_mean(runs[:, :, 2*dim_weights:])
+        theta, theta_std_dev, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
+        m, m_std_dev, _ = norm_and_mean(runs[:, :, dim_weights: 2*dim_weights])
+        v, v_std_dev, _ = norm_and_mean(runs[:, :, 2*dim_weights:])
     elif optimizer == 'RMSProp':
-        theta, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        v, _ = norm_and_mean(runs[:, :, dim_weights:])
+        theta, theta_std_dev, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
+        v, v_std_dev, _ = norm_and_mean(runs[:, :, dim_weights:])
     t1 = time.time()
 
     res = {
         'Loss': loss.to('cpu'),
         'Val_loss': val_loss.to('cpu'),
         'theta_mean': theta.to('cpu'),
+        'theta_std_dev': theta_std_dev.to('cpu'),
         'v_mean': v.to('cpu'),
+        'v_std_dev': v_std_dev.to('cpu'),
         'final_distribution': final_distribution.to('cpu'),
         'final_loss_distribution': final_loss_distribution.to('cpu'),
         'time_steps': ts.cpu(),
@@ -162,6 +164,7 @@ def run_sde_simulations(
     }
     if optimizer == 'Adam':
         res['m_mean'] = m.to('cpu')
+        res['m_std_dev'] = m_std_dev.to('cpu')
     
     print(f"[{which_approximation}] Simulations completed.\n")
     return res
@@ -232,19 +235,21 @@ def run_discrete_simulations(
     final_loss_distribution = Loss_disc[:, -1]
     Loss_disc = Loss_disc.mean(dim=0)
     if optimizer == 'Adam':
-        theta_mean_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        m_mean_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights: 2*dim_weights])
-        v_mean_disc, _ = norm_and_mean(discrete_runs[:, :, 2*dim_weights:])
+        theta_mean_disc, theta_std_dev_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
+        m_mean_disc, m_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights: 2*dim_weights])
+        v_mean_disc, v_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, 2*dim_weights:])
     elif optimizer == 'RMSProp':
-        theta_mean_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        v_mean_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights:])
+        theta_mean_disc, theta_std_dev_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
+        v_mean_disc, v_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights:])
     t1 = time.time()
 
     result_disc = {
         'Loss': Loss_disc.to('cpu'),
         'Val_loss': Val_loss_disc.to('cpu'),
         'theta_mean': theta_mean_disc.to('cpu'),
+        'theta_std_dev': theta_std_dev_disc.to('cpu'),
         'v_mean': v_mean_disc.to('cpu'),
+        'v_std_dev': v_std_dev_disc.to('cpu'),
         'initial_point': y0.to('cpu'),
         'final_distribution': final_distribution_disc.to('cpu'),
         'final_loss_distribution': final_loss_distribution.to('cpu'),
@@ -254,6 +259,7 @@ def run_discrete_simulations(
     }
     if optimizer == 'Adam':
         result_disc['m_mean'] = m_mean_disc.to('cpu')
+        result_disc['m_std_dev'] = m_std_dev_disc.to('cpu')
 
     print("[DISCRETE] Simulations completed.\n")
     return result_disc
@@ -337,17 +343,19 @@ def _run_1st_order_balistic(
     loss_1_order = model.loss_batch(theta_batch)
     val_loss_1_order = model.val_loss_batch(theta_batch)
     final_loss_distribution = loss_1_order[-1]
-    theta_1_order, final_distribution_1_order_det = norm_and_mean(res_cont_1[:, :, :dim_weights])
-    v_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:2*dim_weights])
+    theta_1_order, theta_std_dev_1_order, final_distribution_1_order_det = norm_and_mean(res_cont_1[:, :, :dim_weights])
+    v_1_order, v_std_dev_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:2*dim_weights])
     if optimizer == 'Adam':
-        m_1_order, _ = norm_and_mean(res_cont_1[:, :, 2*dim_weights:])
+        m_1_order, m_std_dev_1_order, _ = norm_and_mean(res_cont_1[:, :, 2*dim_weights:])
     t1 = time.time()
 
     res_1_order_det = {
         'Loss': loss_1_order.to('cpu'),
         'Val_loss': val_loss_1_order.to('cpu'),
         'theta_mean': theta_1_order.to('cpu').squeeze(1),
+        'theta_std_dev': theta_std_dev_1_order.to('cpu').squeeze(1),
         'v_mean': v_1_order.to('cpu').squeeze(1),
+        'v_std_dev': v_std_dev_1_order.to('cpu').squeeze(1),
         'final_distribution': final_distribution_1_order_det.to('cpu'),
         'final_loss_distribution': final_loss_distribution.to('cpu'),
         'time_steps': ts.cpu(),
@@ -356,6 +364,7 @@ def _run_1st_order_balistic(
     }
     if optimizer == 'Adam':
         res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
+        res_1_order_det['m_std_dev'] = m_std_dev_1_order.to('cpu').squeeze(1)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
 
     # Stochastic simulations
@@ -489,6 +498,8 @@ def run_experiment_configuration(
             wandb.log({"time_elapsed": final_results[sim]['time_elapsed'], 'runs': effective_runs})
 
             ts = final_results[sim]['time_steps'].numpy()
+            theta_up = final_results[sim]['theta_mean'] + final_results[sim]['theta_std_dev']
+            theta_down = final_results[sim]['theta_mean'] - final_results[sim]['theta_std_dev']
             for t in range(len(ts)):
                 loss_val = final_results[sim]['Loss'][t].item()
                 val_loss_val = final_results[sim]['Val_loss'][t].item()
@@ -499,7 +510,10 @@ def run_experiment_configuration(
                     f"Loss": loss_val,
                     f"Val_loss": val_loss_val,
                     f"theta": theta_mean,
+                    f"theta_up": theta_mean + 
+                    f"theta_down": theta_mean - final_results[sim]['theta_std_dev'][t].item()
                     f"v": v_mean,
+                    f"v_up": v_mean 
                     "time": ts[t]
                 })
       

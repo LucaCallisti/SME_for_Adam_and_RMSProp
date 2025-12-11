@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Lista dei noise levels da testare
-noise_levels=(0 0.25 1 4)
+noise_levels=(0.25 1 4)
 
 echo "Starting Batch Experiments..."
 
