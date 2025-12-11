@@ -500,20 +500,27 @@ def run_experiment_configuration(
             ts = final_results[sim]['time_steps'].numpy()
             theta_up = final_results[sim]['theta_mean'] + final_results[sim]['theta_std_dev']
             theta_down = final_results[sim]['theta_mean'] - final_results[sim]['theta_std_dev']
+            v_up = final_results[sim]['v_mean'] + final_results[sim]['v_std_dev']
+            v_down = final_results[sim]['v_mean'] - final_results[sim]['v_std_dev']
             for t in range(len(ts)):
                 loss_val = final_results[sim]['Loss'][t].item()
                 val_loss_val = final_results[sim]['Val_loss'][t].item()
                 theta_mean = final_results[sim]['theta_mean'][t].item()
+                theta_up_value = theta_up[t].item()
+                theta_down_value = theta_down[t].item()
                 v_mean = final_results[sim]['v_mean'][t].item()
+                v_up_value = v_up[t].item()
+                v_down_value = v_down[t].item()
                 print(loss_val, val_loss_val, theta_mean, v_mean, ts[t])
                 wandb.log({
                     f"Loss": loss_val,
                     f"Val_loss": val_loss_val,
                     f"theta": theta_mean,
-                    f"theta_up": theta_mean + 
-                    f"theta_down": theta_mean - final_results[sim]['theta_std_dev'][t].item()
+                    f"theta_up": theta_up_value,
+                    f"theta_down": theta_down_value,
                     f"v": v_mean,
-                    f"v_up": v_mean 
+                    f"v_up": v_up_value,
+                    f"v_down": v_down_value,
                     "time": ts[t]
                 })
       
@@ -578,4 +585,5 @@ if __name__ == "__main__":
 
 '''
 python -m NeuralNetwork.main_v3 --regime balistic --optimizer RMSProp; python -m NeuralNetwork.main_v3 --regime balistic --optimizer Adam; python -m NeuralNetwork.main_v3 --regime batch_equivalent --optimizer Adam; python -m NeuralNetwork.main_v3 --regime batch_equivalent --optimizer RMSProp;
+
 '''
