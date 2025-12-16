@@ -46,6 +46,8 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
         self.drift = torch.concat((coef_theta, coef_v), dim = 1)
         self.is_it_Nan(self.drift, x, t, 'drift 2 order')
 
+        # print(f't: {t:.3f}, theta mean: {self.theta.mean().item():.6f}, v mean: {self.v.mean().item():.6f}, drift mean: {self.drift.mean().item():.6f}')
+
         return self.drift
 
     def b_0_theta(self, denom):

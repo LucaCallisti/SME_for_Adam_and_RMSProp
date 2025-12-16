@@ -15,10 +15,10 @@ import math
 
 from Algorithms.Utils import get_regime_functions
 from NeuralNetwork.Utils import set_seed, norm_and_mean, get_parameters
-from NeuralNetwork.Dnn import ShallowNN, MLP
+from NeuralNetwork.Dnn import ShallowNN, MLP, ResNet
 
 import sys
-sys.setrecursionlimit(10000)
+sys.setrecursionlimit(100000)
 
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 
@@ -31,7 +31,7 @@ def parse_arguments() -> argparse.Namespace:
     
     # Model parameters
     model_group = parser.add_argument_group('Model Configuration')
-    model_group.add_argument('--model', type=str, choices=['ShallowNN', 'MLP'], default='MLP', help='Neural network model to use')
+    model_group.add_argument('--model', type=str, choices=['ShallowNN', 'MLP', 'ResNet'], default='MLP', help='Neural network model to use')
     
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
@@ -46,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['2nd_order_sde'], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -133,7 +133,7 @@ def run_sde_simulations(
         for t in range(num_steps):
             val_loss[run, : , t] = model.val_loss_batch(res_cont[:, t, :dim_weights])
             loss[run, : , t] = model.loss_batch(res_cont[:, t, :dim_weights])
-
+    
     # Aggregate results
     loss = loss.reshape(-1, loss.shape[2])
     final_loss_distribution = loss[:, -1]
@@ -167,6 +167,8 @@ def run_sde_simulations(
         res['m_std_dev'] = m_std_dev.to('cpu')
     
     print(f"[{which_approximation}] Simulations completed.\n")
+    del model, runs, loss, val_loss, final_loss_distribution, y0_batched, res_cont, sde
+    torch.cuda.empty_cache()
     return res
 
 def run_discrete_simulations(
@@ -262,6 +264,8 @@ def run_discrete_simulations(
         result_disc['m_std_dev'] = m_std_dev_disc.to('cpu')
 
     print("[DISCRETE] Simulations completed.\n")
+    del model, res, loss_values_disc, discrete_runs, Loss_disc, Val_loss_disc, final_loss_distribution
+    torch.cuda.empty_cache()
     return result_disc
 
 def run_1st_order_sde_simulations(
@@ -336,7 +340,7 @@ def _run_1st_order_balistic(
         Verbose=verbose, epsilon=epsilon, sigma_value=sigma_value
     )
     
-    res_cont_1 = torchsde.sdeint(sde1, y0.unsqueeze(0), ts, method='euler', dt=tau**2).permute(1, 0, 2)
+    res_cont_1 = torchsde.sdeint(sde1, y0.unsqueeze(0), ts, method='euler', dt=tau).permute(1, 0, 2)
     
     # Compute losses for deterministic with batch processing
     theta_batch = res_cont_1[0, :, :dim_weights].to(device)
@@ -366,6 +370,9 @@ def _run_1st_order_balistic(
         res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
         res_1_order_det['m_std_dev'] = m_std_dev_1_order.to('cpu').squeeze(1)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
+    
+    del model, sde1, res_cont_1, theta_batch, loss_1_order, val_loss_1_order, final_loss_distribution
+    torch.cuda.empty_cache()
 
     # Stochastic simulations
     res_1_order_stoc = run_sde_simulations(
@@ -415,6 +422,7 @@ def run_experiment_configuration(
     initial_model = model_factory()
     initial_params = initial_model.initial_weights
     dim_weights = initial_params.shape[0]
+    del initial_model
     
     # Setup time parameters
     num_steps = int(torch.ceil(torch.tensor(args.final_time / tau)).item())
@@ -511,7 +519,6 @@ def run_experiment_configuration(
                 v_mean = final_results[sim]['v_mean'][t].item()
                 v_up_value = v_up[t].item()
                 v_down_value = v_down[t].item()
-                print(loss_val, val_loss_val, theta_mean, v_mean, ts[t])
                 wandb.log({
                     f"Loss": loss_val,
                     f"Val_loss": val_loss_val,
@@ -552,10 +559,6 @@ def main():
     # Parse arguments
     args = parse_arguments()
     
-    print("Starting Neural Network Training with RMSProp SDE Approximations")
-    print(f"Regime: {args.regime}")
-    print(f"Parameters: tau={args.tau_list}, c={args.c}, sigma={args.sigma_list}")
-    print(f"Number of runs: {args.num_runs}")
     
     if args.model == 'ShallowNN':
         def model_factory():
@@ -563,14 +566,31 @@ def main():
     elif args.model == 'MLP':
         def model_factory():
             return MLP()
+    elif args.model == 'ResNet':
+        def model_factory():
+            return ResNet()
     else:
         raise ValueError(f"Unknown model type: {args.model}")
-    tau, sigma, final_time, num_runs = get_parameters(args.model)
+    tau, sigma, final_time, num_runs, batch_size, c, c1, c2 = get_parameters(args.model)
 
     args.num_runs = num_runs
     args.final_time = final_time
+    args.batch_size = batch_size
 
-    # Run experiments for all parameter combinations
+    if c is not None:
+        args.c = c
+    if c1 is not None:
+        args.c_1 = c1
+    if c2 is not None:
+        args.c_2 = c2
+
+    # args.final_time = 0.03
+
+    print("Starting Neural Network Training with RMSProp SDE Approximations")
+    print(f"Optimizer: {args.optimizer}, Regime: {args.regime}, Model: {args.model}")
+    print(f"Parameters: tau={tau}, c={args.c}, sigma={sigma}, final_time={args.final_time}")
+    print(f"Number of runs: {args.num_runs}")
+
     run_experiment_configuration(
         args, model_factory, tau, sigma, epsilon = args.epsilon
     )

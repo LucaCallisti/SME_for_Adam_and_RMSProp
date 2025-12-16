@@ -99,7 +99,6 @@ class RMSprop_SDE_2order_balistic_regime(SDE_basic):
     
 class RMSprop_SDE_1order_balistic_regime(RMSprop_SDE_2order_balistic_regime):
     def f(self, t, x):
-        
         self.chronometer(t)  
         self.divide_input(x, t)
   

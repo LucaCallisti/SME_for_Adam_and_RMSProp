@@ -5,6 +5,7 @@ import torch
 from sklearn.datasets import fetch_california_housing, load_breast_cancer, fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from torchvision import datasets, transforms
 from typing import Tuple, Dict, Any, Optional
 
 def set_seed(seed: int) -> None:
@@ -67,10 +68,10 @@ def load_and_preprocess_data(dataset, test_size: float = 0.2, random_state: int 
         X = data['data']
         y = data['target'].astype(int)
     elif dataset == 'CIFAR10':
-        train_set = CIFAR10(root='./data', train=True, download=True)
-        test_set = CIFAR10(root='./data', train=False, download=True)
+        train_set = datasets.CIFAR10(root='./data', train=True, download=True)
+        test_set = datasets.CIFAR10(root='./data', train=False, download=True)
         
-        X = np.concatenate([train_set.data, test_set.data], axis=0) # Shape: (60000, 32, 32, 3)
+        X = np.concatenate([train_set.data, test_set.data], axis=0) # Shape: (N, 32, 32, 3)
         y = np.concatenate([train_set.targets, test_set.targets], axis=0)
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
@@ -128,14 +129,24 @@ def get_parameters(model_type):
         sigma = 1
         final_time = 50
         num_runs = 32
-    elif model_type == 'MLP':
-        tau = 0.001
-        sigma = 1
-        final_time = 50
-        num_runs = 32
+        batch_size = 32
+        c, c1, c2 = None, None, None
+    elif model_type == 'MLP':       # https://arxiv.org/pdf/2411.15958 F.3 RMSprop: SDE validation, DNN on Breast Cancer Dataset
+        tau = 0.0001
+        sigma = 0.01
+        final_time = 0.2
+        num_runs = 16
+        batch_size = 16
+        c = 5               # to get beta = 0.9995
+        c1 = 100            # to get beta1 = 0.99
+        c2 = 5              # to get beta2 = 0.9995      # Nel paper è 0.999 ma lo imposto a 0.9995 per coerenza con beta 
     elif model_type == 'ResNet':
-        tau = 0.001
-        sigma = 1
-        final_time = 5
-        num_runs = 32
-    return tau, sigma, final_time, num_runs
+        tau = 0.0001        # Preso da RMSProp
+        sigma = 0.0001      # Preso da RMSProp
+        final_time = 0.2    # diverso da loro
+        num_runs = 1
+        batch_size = 1
+        c = 1               # to get beta = 0.9999
+        c1 = 100            # to get beta1 = 0.99   
+        c2 = 1             # to get beta2 = 0.9999
+    return tau, sigma, final_time, num_runs, batch_size, c, c1, c2

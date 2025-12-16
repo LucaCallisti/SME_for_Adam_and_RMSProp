@@ -76,8 +76,10 @@ class SDE_basic(torchsde.SDEIto):
             self.chronometer(t)
             print(f't: {t:.1f}', end='\r')
             self.t_verbose = t + 1
-            # print(f't: {t:.1f}, theta {self.theta[154].item()}, v {self.v[154].item()}, m {self.m[154].item()},drift {self.drift[154]}, self.diag_Sigma {self.diag_Sigma[154].item()}' )
-            # self.temp += 0.05 
+            # try:
+            #     print(f't: {t:.1f}, theta {self.theta.mean().item():.3f}, v {self.v.mean().item():.3f}, drift {self.drift.mean():.3f}, self.diag_Sigma {self.diag_Sigma.mean().item():.3f}' )
+            # except:
+            #     print(f't: {t:.1f}, theta {self.theta.mean().item():.3f}, v {self.v.mean().item():.3f},' )
 
     def divide_input(self, x, t):
         if self.eq == 'RMSProp':

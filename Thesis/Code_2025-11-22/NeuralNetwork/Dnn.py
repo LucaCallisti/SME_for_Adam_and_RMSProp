@@ -17,21 +17,39 @@ class base_nn:
         Returns:
             output di shape (B, output_dim)
         """
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+. Usa BatchParameterNetwork invece.")
 
         def forward_single(theta_vec):
             # Converte theta_vec in dict di parametri
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             # Estrai il primo (e unico) elemento del batch
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            return F.functional_call(self.network, params_dict, (x,))
+            return torch.func.functional_call(self.network, params_dict, (x,))
 
         # Vmap sul primo asse di theta_batch
         batched_forward = F.vmap(forward_single)
         return batched_forward(theta_batch)
+
+    def get_loss_batch_fun(self):
+        def loss_single(theta_vec):
+            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
+            params_dict = {k: v[0] for k, v in params_dict.items()}
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
+            loss_value = torch.mean((y_pred - self.y_val) ** 2)
+            return loss_value
+        return loss_single
+    
+    def loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
+        try:
+            import torch.func as F
+        except ImportError:
+            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
+
+        loss_single = self.get_loss_batch_fun()
+        
+        # Vmap sul primo asse di theta_batch
+        batched_loss = F.vmap(loss_single)
+        self.loss_batch_cached = batched_loss(theta_batch)
+        return self.loss_batch_cached
     
     def val_loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
         try:
@@ -39,12 +57,7 @@ class base_nn:
         except ImportError:
             raise RuntimeError("torch.func richiede PyTorch 2.0+.")
         
-        def loss_single(theta_vec):
-            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
-            params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_val,))
-            loss_value = torch.mean((y_pred - self.y_val) ** 2)
-            return loss_value
+        loss_single = self.get_loss_batch_fun()
         
         # Vmap sul primo asse di theta_batch
         batched_loss = F.vmap(loss_single)
@@ -61,13 +74,7 @@ class base_nn:
         except ImportError:
             raise RuntimeError("torch.func richiede PyTorch 2.0+. Usa BatchParameterNetwork invece.")
 
-        def loss_single(theta_vec):
-            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
-            params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_input,))
-            loss_value = torch.mean((y_pred - self.y_target) ** 2)
-            return loss_value
-
+        loss_single = self.get_loss_batch_fun()
         grad_fn = F.grad(loss_single)
 
         # Vmap sul primo asse di theta_batch
@@ -90,12 +97,7 @@ class base_nn:
             raise ValueError("Specifica theta_batch")
         assert theta_batch.ndim == 2, "theta_batch deve essere (B, total_params)"
         
-        def loss_single(theta_vec):
-            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
-            params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_input,))
-            loss_value = torch.mean((y_pred - self.y_target) ** 2)
-            return loss_value
+        loss_single = self.get_loss_batch_fun()
         
         # Definisci la funzione gradiente
         def grad_fn(theta_vec):
@@ -191,23 +193,14 @@ class ShallowNN(base_nn):
         self.grad_batch = None
         self.loss_batch_cached = None
     
-    def loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
-
+    def get_loss_batch_fun(self):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_input,))
-            loss_value = torch.mean((y_pred - self.y_target) ** 2)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
+            loss_value = torch.mean((y_pred - self.y_val) ** 2)
             return loss_value
-        
-        # Vmap sul primo asse di theta_batch
-        batched_loss = F.vmap(loss_single)
-        self.loss_batch_cached = batched_loss(theta_batch)
-        return self.loss_batch_cached
+        return loss_single
 
 
 
@@ -221,10 +214,10 @@ class MLP(base_nn):
          # Creating datasets
         X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = 'BreastCancer', test_size = 0.2)
         self.x_input = X_train.to(device)
-        self.y_target = y_train.to(device)
+        self.y_target = y_train.squeeze().long().to(device)
 
         self.x_val = X_val.to(device)
-        self.y_val = y_val.to(device)
+        self.y_val = y_val.squeeze().long().to(device)
         
         # Inizializing layers
         self.input_dim = X_train.shape[1]
@@ -235,7 +228,7 @@ class MLP(base_nn):
         self.linear_layers.append(nn.Linear(self.input_dim, hidden_dim).to(device))
         for _ in range(num_layers - 2):
             self.linear_layers.append(nn.Linear(hidden_dim, hidden_dim).to(device))
-        self.linear_layers.append(nn.Linear(hidden_dim, 1).to(device))
+        self.linear_layers.append(nn.Linear(hidden_dim, 2).to(device))
 
         params_list = []
         for layer in self.linear_layers:
@@ -248,8 +241,6 @@ class MLP(base_nn):
             modules_sequence.append(layer)
             if i < len(self.linear_layers) - 1:
                 modules_sequence.append(nn.ReLU())
-            else:
-                modules_sequence.append(nn.Sigmoid())
 
         self.network = nn.Sequential(*modules_sequence).to(device)
 
@@ -270,46 +261,51 @@ class MLP(base_nn):
         self.grad_batch = None
         self.loss_batch_cached = None
 
-    def loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
-
+    def get_loss_batch_fun(self):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_input,))
-            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_target)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
+            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_val)
             return loss_value
-        
-        # Vmap sul primo asse di theta_batch
-        batched_loss = F.vmap(loss_single)
-        self.loss_batch_cached = batched_loss(theta_batch)
-        return self.loss_batch_cached
+        return loss_single
+
+
+class ResidualBlock(nn.Module):
+    """Blocco residuale: output = ReLU(conv(x) + x)"""
+    def __init__(self, conv_layer):
+        super().__init__()
+        self.conv = conv_layer
+        self.relu = nn.ReLU()
+    
+    def forward(self, x):
+        return self.relu(self.conv(x) + x)
 
 
 class ResNet(base_nn):
-    def __init__(self, dataset, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+    def __init__(self, dataset = 'MNIST', device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
         # Creating datasets
         if dataset == 'MNIST':
             input_height, input_width = 28, 28
             in_channels = 1
+            output_dim = 10
         elif dataset == 'CIFAR10':
             input_height, input_width = 32, 32
             in_channels = 3
+            output_dim = 10
         else:
             raise ValueError(f"Dataset {dataset} not supported for ResNet.")
         X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = dataset, test_size = 0.2)
         self.x_input = X_train.to(device)
-        self.y_target = y_train.to(device)
+        self.y_target = y_train.squeeze().long().to(device)
 
         self.x_val = X_val.to(device)
-        self.y_val = y_val.to(device)
+        self.y_val = y_val.squeeze().long().to(device)
         
         # Inizializing layers
         self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=3, stride=1, padding=1).to(device)
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1).to(device)
+        self.res_block = ResidualBlock(self.conv2).to(device)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         final_h = input_height // 2
@@ -317,15 +313,21 @@ class ResNet(base_nn):
         self.flat_dim = 32 * final_h * final_w
 
         self.fc1 = nn.Linear(self.flat_dim, 128).to(device)
-        self.fc2 = nn.Linear(128, 10).to(device)
-        self.to(device)
+        self.fc2 = nn.Linear(128, output_dim).to(device)
 
         self.network = nn.Sequential(
-            self.conv1, self.conv2, self.pool, self.fc1, self.fc2
+            self.conv1,
+            nn.ReLU(),
+            self.res_block,  # Residual: ReLU(conv2(x) + x)
+            self.pool,
+            nn.Flatten(),
+            self.fc1,
+            nn.ReLU(),
+            self.fc2
         ).to(device)
 
         params_list = []
-        for param in self.parameters():
+        for param in self.network.parameters():
             params_list.append(param.flatten()) 
         self.initial_weights = torch.cat(params_list)
 
@@ -344,23 +346,14 @@ class ResNet(base_nn):
         self.grad_batch = None
         self.loss_batch_cached = None
 
-    def loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
-
+    def get_loss_batch_fun(self):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = F.functional_call(self.network, params_dict, (self.x_input,))
-            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_target)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
+            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_val)
             return loss_value
-        
-        # Vmap sul primo asse di theta_batch
-        batched_loss = F.vmap(loss_single)
-        self.loss_batch_cached = batched_loss(theta_batch)
-        return self.loss_batch_cached
+        return loss_single
     
 
 
