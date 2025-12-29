@@ -72,7 +72,7 @@ class SDE_basic(torchsde.SDEIto):
         self.i += 1
     def Verbose(self, t):
 
-        if self.verbose and t > self.t_verbose: 
+        if (self.verbose and t > self.t_verbose) or True: 
             self.chronometer(t)
             print(f't: {t:.1f}', end='\r')
             self.t_verbose = t + 1
@@ -173,7 +173,7 @@ def get_regime_functions(regime: str, optimizer: str) -> Dict[str, Any]:
 
 def get_batch_size(sigma, tau, regime):
     if regime == 'balistic':
-        b_size = int( sigma**(-2) )
+        b_size = int( sigma**(-2) / 10 )
     elif regime == 'batch_equivalent':
         b_size = int( tau * sigma**(-2) )
     else:
@@ -182,7 +182,7 @@ def get_batch_size(sigma, tau, regime):
     return b_size
 def get_sigma(batch_size, tau, regime):
     if regime == 'balistic':
-        return batch_size**(-0.5)
+        return (10 * batch_size)**(-0.5)
     elif regime == 'batch_equivalent':
         return (batch_size / tau)**(-0.5)
     else:

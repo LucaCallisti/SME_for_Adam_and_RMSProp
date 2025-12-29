@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Lista dei noise levels da testare
-NN_type=("MLP")
+NN_type=("ResNet")
 
 echo "Starting Batch Experiments..."
 

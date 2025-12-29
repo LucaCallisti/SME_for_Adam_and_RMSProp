@@ -303,17 +303,20 @@ class ResNet(base_nn):
         self.y_val = y_val.squeeze().long().to(device)
         
         # Inizializing layers
-        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=32, kernel_size=3, stride=1, padding=1).to(device)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1).to(device)
+        hidden_channels = 16
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=hidden_channels, kernel_size=3, stride=1, padding=1).to(device)
+        self.conv2 = nn.Conv2d(in_channels=hidden_channels, out_channels=hidden_channels, kernel_size=3, stride=1, padding=1).to(device)
         self.res_block = ResidualBlock(self.conv2).to(device)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        # self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.pool = torch.nn.AdaptiveAvgPool2d((1, 1))
 
-        final_h = input_height // 2
-        final_w = input_width // 2
-        self.flat_dim = 32 * final_h * final_w
+        # final_h = input_height // 2
+        # final_w = input_width // 2
+        # self.flat_dim = 32 * final_h * final_w
 
-        self.fc1 = nn.Linear(self.flat_dim, 128).to(device)
-        self.fc2 = nn.Linear(128, output_dim).to(device)
+        # self.fc1 = nn.Linear(self.flat_dim, 128).to(device)
+        self.fc1 = nn.Linear(hidden_channels, 16).to(device)
+        self.fc2 = nn.Linear(16, output_dim).to(device)
 
         self.network = nn.Sequential(
             self.conv1,

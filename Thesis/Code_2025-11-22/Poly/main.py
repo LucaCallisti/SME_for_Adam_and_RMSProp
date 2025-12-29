@@ -32,21 +32,21 @@ def parse_arguments() -> argparse.Namespace:
 
     # Function parameters
     func_group = parser.add_argument_group('Function Configuration')
-    func_group.add_argument('--points', type=float, nargs='+', default=[-1.0, 2.0, 0.1, 1.5], help='(x, y) points for Hermite Quintic Polynomial: x1 y1 x2 y2 xM yM')
+    func_group.add_argument('--points', type=float, nargs='+', default=[-1.0, 2.0, 0.1, 1])
     func_group.add_argument('--noise_level', type=float, default=0)
 
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
     # [2.5, 0.5, 0.1,  -0.1, -0.4, -1.3, -1.5]
-    train_group.add_argument('--initial_points', type=float, nargs='+', default=[1.2, 0.1, -0.1, -1.1], help='Initial points for optimization')
+    train_group.add_argument('--initial_points', type=float, nargs='+', default=[1.5, -0.15, -0.3, -1.2], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.005], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma', type=float, default=-1, help='Noise variance values to test')
-    train_group.add_argument('--batch-size-simulation', type = int, default=-1, help='Batch size for simulations')
+    train_group.add_argument('--batch-size-simulation', type = int, default=-10, help='Batch size for simulations')
     train_group.add_argument('--num-runs', type=int, default=256, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=15.0, help='Final time for SDE integration')
+    train_group.add_argument('--final-time', type=float, default=1.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
@@ -55,8 +55,8 @@ def parse_arguments() -> argparse.Namespace:
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='batch_equivalent', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde', '2nd_order_sde'], help='Types of simulations to run')
-    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['2nd_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='RMSProp', help='Optimizer to use for discrete simulations')
 
     # Random seeds
     seed_group = parser.add_argument_group('Random Seeds')
@@ -71,7 +71,7 @@ def parse_arguments() -> argparse.Namespace:
     output_group.add_argument('--results-dir', type=str, default='results', help='Base directory for saving results')
     output_group.add_argument('--verbose', type=bool, default=True, help='Enable verbose output')
     output_group.add_argument('--wandb', type=bool, default=True, help='Enable Weights & Biases logging')
-    
+    output_group.add_argument('--name-project', type=str, default='Poly_with_additional_noise', help='Weights & Biases project name')
     return parser.parse_args()
 
 def run_sde_simulations(
@@ -457,7 +457,8 @@ def run_experiment_configuration(
         config.update({'initial point bf disc' : initial_points_before_disc.item()})
    
         wandb.init(
-            project='Poly_with_additional_noise',
+            project=args.name_project,
+            entity='Effective-continuous-equations',
             name=f'Noise{args.noise_level}_{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
             config=config,
             notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
@@ -517,6 +518,7 @@ def main():
     
     # Run experiments for all parameter combinations
     for tau in args.tau_list:
+        print(args.batch_size_simulation)
         if args.sigma < 0 and args.batch_size_simulation < 0:
             raise ValueError("Either sigma or batch_size_simulation must be provided (non-negative).")
         elif args.sigma < 0:

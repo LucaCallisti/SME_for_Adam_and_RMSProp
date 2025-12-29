@@ -12,9 +12,11 @@ import torch
 import torchsde
 import wandb
 import math
+from torchinfo import summary
+
 
 from Algorithms.Utils import get_regime_functions
-from NeuralNetwork.Utils import set_seed, norm_and_mean, get_parameters
+from NeuralNetwork.Utils import set_seed, process_results, get_parameters, log_results_on_wandb
 from NeuralNetwork.Dnn import ShallowNN, MLP, ResNet
 
 import sys
@@ -41,12 +43,13 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
+    # train_group.add_argument('--device', type=str, default='cpu', help='Device to run simulations on (cpu or cuda)')
     train_group.add_argument('--batch-size', type=int, default=16, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
     regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
-    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['2nd_order_sde'], help='Types of simulations to run')
+    regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['1st_order_sde'], help='Types of simulations to run')
     regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
@@ -68,6 +71,10 @@ def parse_arguments() -> argparse.Namespace:
     data_group.add_argument('--test-size', type=float, default=0.2, help='Fraction of dataset to use for validation')
     data_group.add_argument('--random-state', type=int, default=42, help='Random state for train/test split')
 
+    # Checkpoint configuration
+    checkpoint_group = parser.add_argument_group('Checkpoint Configuration')
+    checkpoint_group.add_argument('--checkpoint', type=torch.Tensor, default=torch.linspace(0, 1, 11), help='Checkpoints for recording metrics during training')
+
     return parser.parse_args()
 
 def run_sde_simulations(
@@ -86,6 +93,7 @@ def run_sde_simulations(
         batch_size: int,
         epsilon: float,
         sigma_value: float,
+        checkpoint: torch.Tensor,
         seed: int,
         device: str = 'cpu',
         verbose: bool = False
@@ -136,38 +144,34 @@ def run_sde_simulations(
     
     # Aggregate results
     loss = loss.reshape(-1, loss.shape[2])
-    final_loss_distribution = loss[:, -1]
-    loss = loss.mean(dim=0)
-    val_loss = val_loss.reshape(-1, val_loss.shape[2]).mean(dim=0)
+    val_loss = val_loss.reshape(-1, val_loss.shape[2])
+    res_loss = process_results(loss, checkpoints = checkpoint, variable='Loss', Norm_bool=False)
+    res_val_loss = process_results(val_loss, checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
+    res = res_loss
+    res.update(res_val_loss)
+
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
+    res_theta = process_results(runs[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
+    res.update(res_theta)
+    res_v = process_results(runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    res.update(res_v)
     if optimizer == 'Adam':
-        theta, theta_std_dev, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        m, m_std_dev, _ = norm_and_mean(runs[:, :, dim_weights: 2*dim_weights])
-        v, v_std_dev, _ = norm_and_mean(runs[:, :, 2*dim_weights:])
-    elif optimizer == 'RMSProp':
-        theta, theta_std_dev, final_distribution = norm_and_mean(runs[:, :, :dim_weights])
-        v, v_std_dev, _ = norm_and_mean(runs[:, :, dim_weights:])
+        res_m = process_results(runs[:, :, dim_weights: 2*dim_weights], checkpoints = checkpoint, variable='m')
+        res.update(res_m)
+
     t1 = time.time()
 
-    res = {
-        'Loss': loss.to('cpu'),
-        'Val_loss': val_loss.to('cpu'),
-        'theta_mean': theta.to('cpu'),
-        'theta_std_dev': theta_std_dev.to('cpu'),
-        'v_mean': v.to('cpu'),
-        'v_std_dev': v_std_dev.to('cpu'),
-        'final_distribution': final_distribution.to('cpu'),
-        'final_loss_distribution': final_loss_distribution.to('cpu'),
+    additional_info =  {
         'time_steps': ts.cpu(),
+        'initial_point': y0.to('cpu'),
         'time_elapsed': t1 - t0,
-        'n_runs': num_batched_runs * batch_size
+        'n_runs': num_batched_runs * batch_size,
+        'checkpoints': checkpoint.to('cpu')
     }
-    if optimizer == 'Adam':
-        res['m_mean'] = m.to('cpu')
-        res['m_std_dev'] = m_std_dev.to('cpu')
+    res.update(additional_info)
     
     print(f"[{which_approximation}] Simulations completed.\n")
-    del model, runs, loss, val_loss, final_loss_distribution, y0_batched, res_cont, sde
+    del model, runs, loss, val_loss, y0_batched, res_cont, sde
     torch.cuda.empty_cache()
     return res
 
@@ -186,6 +190,7 @@ def run_discrete_simulations(
     num_runs: int,
     batch_size: int,
     dim_weights: int,
+    checkpoint: torch.Tensor,
     seed: int,
     device: str = 'cpu',
     verbose: bool = False
@@ -206,7 +211,6 @@ def run_discrete_simulations(
     elif optimizer == 'RMSProp':
         dim_result = dim_weights * 2  # theta, v
     Loss_disc, Val_loss_disc, discrete_runs = torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point), torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point), torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point, dim_result)
-    final_loss_distribution = torch.zeros(num_runs)
     model = model_factory()
     y0 = None
     
@@ -232,41 +236,35 @@ def run_discrete_simulations(
         
     # Aggregate results
     discrete_runs = discrete_runs.reshape(-1, discrete_runs.shape[2], discrete_runs.shape[3])
-    Val_loss_disc = Val_loss_disc.reshape(-1, Val_loss_disc.shape[2]).mean(dim=0)
     Loss_disc = Loss_disc.reshape(-1, Loss_disc.shape[2])
-    final_loss_distribution = Loss_disc[:, -1]
-    Loss_disc = Loss_disc.mean(dim=0)
+    Val_loss_disc = Val_loss_disc.reshape(-1, Val_loss_disc.shape[2])
+    res_loss = process_results(Loss_disc, checkpoints = checkpoint, variable='Loss', Norm_bool=False)
+    res_val_loss = process_results(Val_loss_disc,checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
+    res = res_loss
+    res.update(res_val_loss)
+    
+    res_theta = process_results(discrete_runs[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
+    res_v = process_results(discrete_runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    res.update(res_theta)
+    res.update(res_v)
     if optimizer == 'Adam':
-        theta_mean_disc, theta_std_dev_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        m_mean_disc, m_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights: 2*dim_weights])
-        v_mean_disc, v_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, 2*dim_weights:])
-    elif optimizer == 'RMSProp':
-        theta_mean_disc, theta_std_dev_disc, final_distribution_disc = norm_and_mean(discrete_runs[:, :, :dim_weights])
-        v_mean_disc, v_std_dev_disc, _ = norm_and_mean(discrete_runs[:, :, dim_weights:])
-    t1 = time.time()
+        res_m = process_results(discrete_runs[:, :, dim_weights: 2*dim_weights], checkpoints = checkpoint, variable='m')
+        res.update(res_m)
 
-    result_disc = {
-        'Loss': Loss_disc.to('cpu'),
-        'Val_loss': Val_loss_disc.to('cpu'),
-        'theta_mean': theta_mean_disc.to('cpu'),
-        'theta_std_dev': theta_std_dev_disc.to('cpu'),
-        'v_mean': v_mean_disc.to('cpu'),
-        'v_std_dev': v_std_dev_disc.to('cpu'),
+    t1 = time.time()
+    additional_info = {
         'initial_point': y0.to('cpu'),
-        'final_distribution': final_distribution_disc.to('cpu'),
-        'final_loss_distribution': final_loss_distribution.to('cpu'),
         'time_steps': torch.arange(tau * skip_initial_point, tau * (num_steps), tau).cpu(),
         'time_elapsed': t1 - t0,
-        'n_runs': num_batched_runs * batch_size
+        'n_runs': num_batched_runs * batch_size,
+        'checkpoints': checkpoint.to('cpu')
     }
-    if optimizer == 'Adam':
-        result_disc['m_mean'] = m_mean_disc.to('cpu')
-        result_disc['m_std_dev'] = m_std_dev_disc.to('cpu')
+    res.update(additional_info)
 
     print("[DISCRETE] Simulations completed.\n")
-    del model, res, loss_values_disc, discrete_runs, Loss_disc, Val_loss_disc, final_loss_distribution
+    del model, loss_values_disc, discrete_runs, Loss_disc, Val_loss_disc
     torch.cuda.empty_cache()
-    return result_disc
+    return res
 
 def run_1st_order_sde_simulations(
     regime: str,
@@ -284,6 +282,7 @@ def run_1st_order_sde_simulations(
     batch_size: int,
     epsilon: float,
     sigma_value: float,
+    checkpoint: torch.Tensor,
     seed: int,
     device: str = 'cpu',
     verbose: bool = False
@@ -299,12 +298,12 @@ def run_1st_order_sde_simulations(
     if regime == 'balistic':
         return _run_1st_order_balistic(
             model_factory, optimizer, regime_funcs, y0, tau, c, final_time, skip_initial_point, ts, initial_params,
-            dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoint, seed, device, verbose=verbose
         )
     elif regime == 'batch_equivalent':
         return run_sde_simulations(
             model_factory, optimizer, regime_funcs, 'approx_1_fun', y0, tau, c, final_time, skip_initial_point,
-            initial_params, dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            initial_params, dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoint, seed, device, verbose=verbose
         ), None
 
 def _run_1st_order_balistic(
@@ -323,6 +322,7 @@ def _run_1st_order_balistic(
     batch_size: int,
     epsilon: float,
     sigma_value: float,
+    checkpoint: torch.Tensor,
     seed: int,
     device: str = 'cpu',
     verbose: bool = False
@@ -346,49 +346,47 @@ def _run_1st_order_balistic(
     theta_batch = res_cont_1[0, :, :dim_weights].to(device)
     loss_1_order = model.loss_batch(theta_batch)
     val_loss_1_order = model.val_loss_batch(theta_batch)
-    final_loss_distribution = loss_1_order[-1]
-    theta_1_order, theta_std_dev_1_order, final_distribution_1_order_det = norm_and_mean(res_cont_1[:, :, :dim_weights])
-    v_1_order, v_std_dev_1_order, _ = norm_and_mean(res_cont_1[:, :, dim_weights:2*dim_weights])
-    if optimizer == 'Adam':
-        m_1_order, m_std_dev_1_order, _ = norm_and_mean(res_cont_1[:, :, 2*dim_weights:])
-    t1 = time.time()
+    res_loss = process_results(loss_1_order.unsqueeze(0), checkpoints = checkpoint, variable='Loss', Norm_bool=False)
+    res_val_loss = process_results(val_loss_1_order.unsqueeze(0), checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
+    res = res_loss
+    res.update(res_val_loss)
 
-    res_1_order_det = {
-        'Loss': loss_1_order.to('cpu'),
-        'Val_loss': val_loss_1_order.to('cpu'),
-        'theta_mean': theta_1_order.to('cpu').squeeze(1),
-        'theta_std_dev': theta_std_dev_1_order.to('cpu').squeeze(1),
-        'v_mean': v_1_order.to('cpu').squeeze(1),
-        'v_std_dev': v_std_dev_1_order.to('cpu').squeeze(1),
-        'final_distribution': final_distribution_1_order_det.to('cpu'),
-        'final_loss_distribution': final_loss_distribution.to('cpu'),
+    res_theta = process_results(res_cont_1[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
+    res_v = process_results(res_cont_1[:, :, dim_weights:2*dim_weights], checkpoints = checkpoint, variable='v')
+    res.update(res_theta)
+    res.update(res_v)
+    if optimizer == 'Adam':
+        res_m = process_results(res_cont_1[:, :, 2*dim_weights:], checkpoints = checkpoint, variable='m')
+        res.update(res_m)
+    t1 = time.time()
+    additional_info = {
         'time_steps': ts.cpu(),
         'time_elapsed': t1 - t0,
+        'checkpoints': checkpoint.to('cpu'),
         'n_runs': 1
     }
-    if optimizer == 'Adam':
-        res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
-        res_1_order_det['m_std_dev'] = m_std_dev_1_order.to('cpu').squeeze(1)
+    res.update(additional_info)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
     
-    del model, sde1, res_cont_1, theta_batch, loss_1_order, val_loss_1_order, final_loss_distribution
+    del model, sde1, res_cont_1, theta_batch, loss_1_order, val_loss_1_order
     torch.cuda.empty_cache()
 
     # Stochastic simulations
     res_1_order_stoc = run_sde_simulations(
             model_factory, optimizer, regime_funcs, 'approx_1_fun', y0, tau, c, final_time, skip_initial_point,
-            initial_params, dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            initial_params, dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoint, seed, device, verbose=verbose
         )
     
     print("[1ST ORDER SDE] Stochastic simulations completed.\n")
     
-    return res_1_order_stoc, res_1_order_det
+    return res_1_order_stoc, res
 
 def run_experiment_configuration(
     args: argparse.Namespace,
     model_factory: callable,
     tau: float,
     sigma_value: float,
+    checkpoint: torch.Tensor,
     epsilon: float = 0.1
 ) -> None:
     """
@@ -434,35 +432,14 @@ def run_experiment_configuration(
     # Generate noise
     set_seed(args.seed_noise)
     noise = sigma_value * torch.randn((5000, initial_params.shape[0]))
-    
-    t0 = time.time()
-    
+        
     # Run discrete simulations
     res_disc = run_discrete_simulations(
         model_factory, args.optimizer, regime_funcs, noise, tau, beta, args.c, num_steps, 
         initial_params, args.skip_initial_point, epsilon, args.num_runs, args.batch_size,
-        dim_weights, args.seed_disc, args.device, args.verbose
+        dim_weights, checkpoint, args.seed_disc, args.device, args.verbose
     )
-    y0 = res_disc['initial_point'].to(args.device)
-    # Run 1st order SDE simulations
-    res_1_order_det = None
-    if '1st_order_sde' in args.simulations:
-        res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
-            args.regime, args.optimizer, model_factory, regime_funcs, y0, tau, args.c, args.final_time,
-            args.skip_initial_point, initial_params, dim_weights,
-            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_1st, args.device, args.verbose
-        )
-
-    # # Run 2nd order SDE simulations
-    if '2nd_order_sde' in args.simulations:
-        res_2_order = run_sde_simulations(
-            model_factory, args.optimizer, regime_funcs, 'approx_2_fun', y0, tau, args.c, args.final_time,
-            args.skip_initial_point, initial_params, dim_weights,
-            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
-        )
-    
-    t1 = time.time()
-    final_results = {
+    base_results = {
         'disc': res_disc,
         'final_time': args.final_time,
         'tau': tau,
@@ -471,94 +448,44 @@ def run_experiment_configuration(
         'epsilon': epsilon,
         'regime': args.regime,
         'optimizer': args.optimizer,
-        'total_time_elapsed': t1 - t0,
         'skipped_initial_points': args.skip_initial_point,
         'simulation keys': ['disc']
     }
+    log_results_on_wandb(base_results, args, 'disc', tau, sigma_value, result_dir)
+
+    y0 = res_disc['initial_point'].to(args.device)
+    # Run 1st order SDE simulations
+    res_1_order_det = None
     if '1st_order_sde' in args.simulations:
-        final_results['1_order_stoc'] = res_1_order_stoc
-        final_results['simulation keys'] += ['1_order_stoc']
+        res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
+            args.regime, args.optimizer, model_factory, regime_funcs, y0, tau, args.c, args.final_time,
+            args.skip_initial_point, initial_params, dim_weights,
+            args.num_runs, args.batch_size, epsilon, sigma_value, checkpoint, args.seed_1st, args.device, args.verbose
+        )
+        base_results['1_order_stoc'] = res_1_order_stoc
+        base_results['simulation keys'] += ['1_order_stoc']
+        log_results_on_wandb(base_results, args, '1_order_stoc', tau, sigma_value, result_dir)
+        if res_1_order_det is not None:
+            base_results['1_order_det'] = res_1_order_det
+            base_results['simulation keys'] += ['1_order_det']
+            log_results_on_wandb(base_results, args, '1_order_det', tau, sigma_value, result_dir)
+
+    # # Run 2nd order SDE simulations
     if '2nd_order_sde' in args.simulations:
-        final_results['2_order_stoc'] = res_2_order
-        final_results['simulation keys'] += ['2_order_stoc']
-    if res_1_order_det is not None:
-        final_results['1_order_det'] = res_1_order_det
-        final_results['simulation keys'] += ['1_order_det']
-
-    # Save results
-    torch.save(final_results, os.path.join(result_dir, f'results_regime{args.regime}_tau{tau}_c{args.c}_sigma{sigma_value}.pt'))
-   
-    effective_runs = math.ceil(args.num_runs / args.batch_size) * args.batch_size
-
-    # wandb logging
-    if args.wandb:
-        for sim in final_results['simulation keys']:
-            wandb.init(
-                project=f'{args.model}',
-                name=f'{args.optimizer}_{regime_name}_{sim}_tau_{tau}_c_{args.c}_sigma_{sigma_value}_nruns_{effective_runs}',
-                config=vars(args),
-                notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
-                save_code=True
-            )
-            artifact = wandb.Artifact(f"final_results_tau_{tau}_sigma_{sigma_value}", type="results")
-            artifact.add_file(os.path.join(result_dir, f'results_regime{args.regime}_tau{tau}_c{args.c}_sigma{sigma_value}.pt'))
-            wandb.log_artifact(artifact)
-            wandb.log({"time_elapsed": final_results[sim]['time_elapsed'], 'runs': effective_runs})
-
-            ts = final_results[sim]['time_steps'].numpy()
-            theta_up = final_results[sim]['theta_mean'] + final_results[sim]['theta_std_dev']
-            theta_down = final_results[sim]['theta_mean'] - final_results[sim]['theta_std_dev']
-            v_up = final_results[sim]['v_mean'] + final_results[sim]['v_std_dev']
-            v_down = final_results[sim]['v_mean'] - final_results[sim]['v_std_dev']
-            for t in range(len(ts)):
-                loss_val = final_results[sim]['Loss'][t].item()
-                val_loss_val = final_results[sim]['Val_loss'][t].item()
-                theta_mean = final_results[sim]['theta_mean'][t].item()
-                theta_up_value = theta_up[t].item()
-                theta_down_value = theta_down[t].item()
-                v_mean = final_results[sim]['v_mean'][t].item()
-                v_up_value = v_up[t].item()
-                v_down_value = v_down[t].item()
-                wandb.log({
-                    f"Loss": loss_val,
-                    f"Val_loss": val_loss_val,
-                    f"theta": theta_mean,
-                    f"theta_up": theta_up_value,
-                    f"theta_down": theta_down_value,
-                    f"v": v_mean,
-                    f"v_up": v_up_value,
-                    f"v_down": v_down_value,
-                    "time": ts[t]
-                })
-      
-
-            # Log final distributions as histograms to wandb
-            fd = final_results[sim]['final_distribution'].cpu().numpy().flatten()
-            table = wandb.Table(data=[[v] for v in fd], columns=["value"])
-            wandb.log({
-                f"Histogram/final_theta_distribution":
-                    wandb.plot.histogram(table, "value", title=f"{final_results['regime']} {sim} Final Distribution")
-            })
-
-
-            fld = final_results[sim]['final_loss_distribution'].cpu().numpy()
-            if fld.ndim == 0:
-                fld = fld.reshape(-1)
-            table = wandb.Table(data=[[v] for v in fld], columns=["value"])
-            wandb.log({
-                f"Histogram/final_loss_distribution":
-                    wandb.plot.histogram(table, "value", title=f"{final_results['regime']} {sim} Final Loss Distribution")
-            })
-
-            wandb.finish()
-    print(f"[tau={tau}] Execution time: {t1-t0:.2f} seconds\n")
+        res_2_order = run_sde_simulations(
+            model_factory, args.optimizer, regime_funcs, 'approx_2_fun', y0, tau, args.c, args.final_time,
+            args.skip_initial_point, initial_params, dim_weights,
+            args.num_runs, args.batch_size, epsilon, sigma_value, checkpoint, args.seed_2nd, args.device, args.verbose
+        )
+        base_results['2_order_stoc'] = res_2_order
+        base_results['simulation keys'] += ['2_order_stoc']
+        log_results_on_wandb(base_results, args, '2_order_stoc', tau, sigma_value, result_dir)
     
 
 def main():
     """Main execution function."""
     # Parse arguments
-    args = parse_arguments()
-    
+    args = parse_arguments()    
     
     if args.model == 'ShallowNN':
         def model_factory():
@@ -568,14 +495,15 @@ def main():
             return MLP()
     elif args.model == 'ResNet':
         def model_factory():
-            return ResNet()
+            return ResNet(device=args.device)
+        summary(model_factory().network, input_size=(1, 1, 28, 28))
     else:
         raise ValueError(f"Unknown model type: {args.model}")
     tau, sigma, final_time, num_runs, batch_size, c, c1, c2 = get_parameters(args.model)
-
     args.num_runs = num_runs
     args.final_time = final_time
     args.batch_size = batch_size
+    args.tau = tau
 
     if c is not None:
         args.c = c
@@ -584,16 +512,24 @@ def main():
     if c2 is not None:
         args.c_2 = c2
 
-    # args.final_time = 0.03
+
 
     print("Starting Neural Network Training with RMSProp SDE Approximations")
     print(f"Optimizer: {args.optimizer}, Regime: {args.regime}, Model: {args.model}")
     print(f"Parameters: tau={tau}, c={args.c}, sigma={sigma}, final_time={args.final_time}")
     print(f"Number of runs: {args.num_runs}")
 
-    run_experiment_configuration(
-        args, model_factory, tau, sigma, epsilon = args.epsilon
-    )
+    if isinstance(sigma, list):
+        for s in sigma:
+            args.sigma = s
+            run_experiment_configuration(
+                args, model_factory, tau, s, checkpoint = args.checkpoint, epsilon = args.epsilon
+            )
+    else:
+        args.sigma = sigma
+        run_experiment_configuration(
+            args, model_factory, tau, sigma, checkpoint = args.checkpoint, epsilon = args.epsilon
+        )
     
     print("All experiments completed successfully!")
 

@@ -17,13 +17,15 @@ def plot_poly_result(final_results, poly, tau, result_dir, args):
         limsup = float(initial_before)
     x = torch.linspace(liminf, limsup, 1000)
 
+    vertical_scaling_factor = - 1.0
+
     f1 = 0.5 * poly.f1(x).cpu().numpy()
     f2 = 0.5 * poly.f2(x).cpu().numpy()
-    f = poly.f(x).cpu().numpy() - 1.2 
+    f = poly.f(x).cpu().numpy() + vertical_scaling_factor
     x_np = x.cpu().numpy()
 
-    f_initial_before = poly.f(torch.as_tensor(initial_before)).cpu().numpy() -1.2
-    f_initial_after = poly.f(torch.as_tensor(initial_after)).cpu().numpy() -1.2
+    f_initial_before = poly.f(torch.as_tensor(initial_before)).cpu().numpy() + vertical_scaling_factor
+    f_initial_after = poly.f(torch.as_tensor(initial_after)).cpu().numpy() + vertical_scaling_factor
 
     dist_disc = final_results['disc']['final_distribution'].cpu().numpy().flatten()
     dist_1st = final_results['1_order_stoc']['final_distribution'].cpu().numpy().flatten() if '1_order_stoc' in final_results else None
@@ -46,7 +48,7 @@ def plot_poly_result(final_results, poly, tau, result_dir, args):
     ax1.set_xlabel('x')
     ax1.set_ylabel('Function values')
 
-    ax1.set_xlim(-1.3, 1.3)
+    ax1.set_xlim(-1.3, 1.6)
     ax1.set_ylim(0, 2)
 
     ax1.legend(loc='upper left')

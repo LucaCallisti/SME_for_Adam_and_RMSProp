@@ -201,6 +201,8 @@ def Discrete_RMProp_balistic_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         path_v[:, step+1] = (1 - c * tau) * v + c * tau * grad**2
         path_x[:, step+1] = x - tau * grad / (torch.sqrt(v) + epsilon)
 
+        # print(f'step {step}, {path_v[:, step][0].item():.6f}, {path_x[:, step][0].item():.6f}, {grad[0].item():.6f}')
+
         if step % 10000 == 0:
             print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
             start = time.time()

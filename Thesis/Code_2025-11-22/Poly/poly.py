@@ -108,20 +108,26 @@ class Poly2(base_poly):
 class Poly_with_additional_noise(base_poly):
     def __init__(self, x1, x2, c, d, noise_level=0):
         '''
-        The function is defined as: f_1 (x) = 2 * c*(x- x1 )^2 * (x- x2 )^2,  f_2 (x) =   2 * d * x^2
+        The function is defined as: f_1 (x) = 2 * c*(x- x1 )^2 * (x- x2 )^4,  f_2 (x) =   2 * d * x^2
         and f(x) = 0.5 * ( f_1 (x) + f_2 (x) )
         '''
 
         self.x_liminf = -1.5
         self.x_limsup = 3
 
+        # Translation of the original functions
+        translation_quantitiy = 0.1
+        x1 = x1 - translation_quantitiy
+        x2 = x2 - translation_quantitiy
+
         self.f1_old = lambda x: 2 * c * (x-x1)**2 * (x - x2)**4
         self.f1_prime_old = lambda x: 2 * c * ( 2*(x - x1) * (x - x2)**4 + 4*(x - x2)**3 * (x - x1)**2 )
         self.f1_second_old = lambda x: 2 * c * ( 2*(x - x2)**4 + 8*(x - x1)*(x - x2)**3 + 12*(x - x2)**2 * (x - x1)**2 + 8*(x - x2)**3 * (x - x1) )
         self.f1_third_old =  lambda x: 2 * c * ( 8*(x - x2)**3 + 8*(x - x2) + 24*(x - x1)*(x - x2)**2 + 24*(x - x2)*(x - x1)**2 + 24*(x - x1)*(x - x2)**2 + 8*(x - x2)**3 + 24*(x - x2)**2 * (x - x1) )
 
-        self.f2_old = lambda x: 2 * d * x**2
-        self.f2_prime_old = lambda x: 4 * d * x
+        # Traslation of the original functions
+        self.f2_old = lambda x: 2 * d * (x - translation_quantitiy)**2
+        self.f2_prime_old = lambda x: 4 * d * (x - translation_quantitiy)
         self.f2_second_old = lambda x: 4 * d * torch.ones_like(x)
         self.f2_third_old = lambda x: torch.zeros_like(x)
 
