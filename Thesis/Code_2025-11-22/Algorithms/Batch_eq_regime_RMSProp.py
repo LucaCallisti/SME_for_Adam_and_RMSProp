@@ -201,7 +201,7 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
             start = time.time()
 
         if (verbose and tau * step > temp):
-            temp += 1
+            temp += 0.1
             print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, Delta x { (tau * grad / (torch.sqrt(v) + epsilon)).mean().item():.4f}, epsilon {epsilon}')
     if loss_bool:
         Loss_values[:, -1] = funz.loss_batch(path_x[:, -1])

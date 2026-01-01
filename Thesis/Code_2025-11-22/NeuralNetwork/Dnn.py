@@ -281,7 +281,7 @@ class ResNet(base_nn):
         self.x_input = X_train.to(device)
         self.y_target = y_train.squeeze().long().to(device)
 
-        self.Batch_for_hessian = 1000
+        self.Batch_for_hessian = 10
         print("Using Batch size for Hessian:", self.Batch_for_hessian)
         cutoff = (self.x_input.shape[0] // self.Batch_for_hessian) * self.Batch_for_hessian
         self.x_input = self.x_input[:cutoff]

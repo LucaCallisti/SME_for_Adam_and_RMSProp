@@ -41,9 +41,6 @@ def log_results_on_wandb(final_results: Dict[str, Any], args: Any, sim : str, ta
         loss_down = final_results[sim]['Loss'][0, t].item()
         loss_mean = final_results[sim]['Loss'][1, t].item()
         loss_up = final_results[sim]['Loss'][2, t].item()
-        val_loss_down = final_results[sim]['Val_loss'][0, t].item()
-        val_loss_mean = final_results[sim]['Val_loss'][1, t].item()
-        val_loss_up = final_results[sim]['Val_loss'][2, t].item()
         theta_down_value = theta[0, t].item()
         theta_mean = theta[1, t].item()
         theta_up_value = theta[2, t].item()
@@ -54,9 +51,6 @@ def log_results_on_wandb(final_results: Dict[str, Any], args: Any, sim : str, ta
             f"Loss": loss_mean,
             f"Loss_up": loss_up,
             f"Loss_down": loss_down,
-            f"Val_loss": val_loss_mean,
-            f"Val_loss_up": val_loss_up,
-            f"Val_loss_down": val_loss_down,
             f"theta": theta_mean,
             f"theta_up": theta_up_value,
             f"theta_down": theta_down_value,
