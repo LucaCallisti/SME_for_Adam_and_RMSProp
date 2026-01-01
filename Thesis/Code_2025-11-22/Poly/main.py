@@ -15,7 +15,7 @@ import wandb
 import math
 
 
-from Poly.Utils import set_seed, processing_outputs
+from Poly.Utils import set_seed, processing_outputs_caller, log_to_wandb
 from Poly.poly import Poly2, Poly_with_additional_noise
 from Algorithms.Utils import get_regime_functions, get_batch_size, get_sigma
 from Poly.Plot_poly import plot_poly_result
@@ -37,7 +37,7 @@ def parse_arguments() -> argparse.Namespace:
 
     # Training parameters
     train_group = parser.add_argument_group('Training Configuration')
-    # [2.5, 0.5, 0.1,  -0.1, -0.4, -1.3, -1.5]
+    # [1.5, -0.15, -0.3, -1.2]
     train_group.add_argument('--initial_points', type=float, nargs='+', default=[1.5, -0.15, -0.3, -1.2], help='Initial points for optimization')
     train_group.add_argument('--tau-list', type=float, nargs='+', default=[0.005], help='Learning rate values to test')
     train_group.add_argument('--c', type=float, default=0.5, help='RMSProp scaling constant of beta')
@@ -45,18 +45,18 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--sigma', type=float, default=-1, help='Noise variance values to test')
     train_group.add_argument('--batch-size-simulation', type = int, default=-10, help='Batch size for simulations')
-    train_group.add_argument('--num-runs', type=int, default=256, help='Number of simulation runs for averaging')
+    train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
     train_group.add_argument('--final-time', type=float, default=1.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
-    train_group.add_argument('--batch-size', type=int, default=256, help='Batch size for training')
+    train_group.add_argument('--batch-size', type=int, default=1024, help='Batch size for training')
 
     # Regime selection
     regime_group = parser.add_argument_group('Regime Configuration')
-    regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='batch_equivalent', help='Optimization regime to use')
+    regime_group.add_argument('--regime', type=str, choices=['balistic', 'batch_equivalent'], default='balistic', help='Optimization regime to use')
     regime_group.add_argument('--simulations', type=str, nargs='+', choices=['1st_order_sde', '2nd_order_sde'], default=['2nd_order_sde'], help='Types of simulations to run')
-    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='RMSProp', help='Optimizer to use for discrete simulations')
+    regime_group.add_argument('--optimizer', type=str, choices=['Adam', 'RMSProp'], default='Adam', help='Optimizer to use for discrete simulations')
 
     # Random seeds
     seed_group = parser.add_argument_group('Random Seeds')
@@ -89,6 +89,7 @@ def run_sde_simulations(
         batch_size: int,
         epsilon: float,
         sigma_value: float,
+        checkpoints: torch.Tensor,
         seed: int,
         device: str = 'cpu',
         verbose: bool = False
@@ -132,25 +133,15 @@ def run_sde_simulations(
 
     # Aggregate results
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
-    if optimizer == 'Adam':
-        theta, final_distribution = processing_outputs(runs[:, :, :dim_weights])
-        m, _ = processing_outputs(runs[:, :, dim_weights: 2*dim_weights])
-        v, _ = processing_outputs(runs[:, :, 2*dim_weights:])
-    elif optimizer == 'RMSProp':
-        theta, final_distribution = processing_outputs(runs[:, :, :dim_weights])
-        v, _ = processing_outputs(runs[:, :, dim_weights:])
+    res_runs = processing_outputs_caller(runs, dim_weights, checkpoints=checkpoints, optimizer=optimizer)
     t1 = time.time()
 
     res = {
-        'theta_mean': theta.to('cpu'),
-        'v_mean': v.to('cpu'),
-        'final_distribution': final_distribution.to('cpu'),
         'time_steps': ts.cpu(),
         'time_elapsed': t1 - t0,
         'n_runs': num_batched_runs * batch_size
     }
-    if optimizer == 'Adam':
-        res['m_mean'] = m.to('cpu')
+    res.update(res_runs)
     
     print(f"[{which_approximation}] Simulations completed.\n")
     return res
@@ -170,6 +161,7 @@ def run_discrete_simulations(
     num_runs: int,
     batch_size: int,
     dim_weights: int,
+    checkpoints: torch.Tensor,
     seed: int,
     verbose: bool = False
 ) -> Dict[str, Any]:
@@ -189,7 +181,6 @@ def run_discrete_simulations(
     elif optimizer == 'RMSProp':
         dim_result = dim_weights * 2  # theta, v
     discrete_runs = torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point, dim_result)
-    final_loss_distribution = torch.zeros(num_runs)
     y0 = None
     
     for run in range(num_batched_runs):
@@ -209,27 +200,16 @@ def run_discrete_simulations(
         
     # Aggregate results
     discrete_runs = discrete_runs.reshape(-1, discrete_runs.shape[2], discrete_runs.shape[3])
-    if optimizer == 'Adam':
-        theta_mean_disc, final_distribution_disc = processing_outputs(discrete_runs[:, :, :dim_weights])
-        m_mean_disc, _ = processing_outputs(discrete_runs[:, :, dim_weights: 2*dim_weights])
-        v_mean_disc, _ = processing_outputs(discrete_runs[:, :, 2*dim_weights:])
-    elif optimizer == 'RMSProp':
-        theta_mean_disc, final_distribution_disc = processing_outputs(discrete_runs[:, :, :dim_weights])
-        v_mean_disc, _ = processing_outputs(discrete_runs[:, :, dim_weights:])
+    res_runs = processing_outputs_caller(discrete_runs, dim_weights, checkpoints=checkpoints, optimizer=optimizer)
     t1 = time.time()
 
     result_disc = {
-        'theta_mean': theta_mean_disc.to('cpu'),
-        'v_mean': v_mean_disc.to('cpu'),
         'initial_point': y0.to('cpu'),
-        'final_distribution': final_distribution_disc.to('cpu'),
-        'final_loss_distribution': final_loss_distribution.to('cpu'),
         'time_steps': torch.arange(tau * skip_initial_point, tau * (num_steps), tau).cpu(),
         'time_elapsed': t1 - t0,
         'n_runs': num_batched_runs * batch_size
     }
-    if optimizer == 'Adam':
-        result_disc['m_mean'] = m_mean_disc.to('cpu')
+    result_disc.update(res_runs)
 
     print("[DISCRETE] Simulations completed.\n")
     return result_disc
@@ -249,6 +229,7 @@ def run_1st_order_sde_simulations(
     batch_size: int,
     epsilon: float,
     sigma_value: float,
+    checkpoints: torch.Tensor,
     seed: int,
     device: str = 'cpu',
     verbose: bool = False
@@ -264,12 +245,12 @@ def run_1st_order_sde_simulations(
     if regime == 'balistic':
         return _run_1st_order_balistic(
             poly, optimizer, regime_funcs, initial_points, tau, c, final_time, skip_initial_point, ts,
-            dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoints, seed, device, verbose=verbose
         )
     elif regime == 'batch_equivalent':
         return run_sde_simulations(
             poly, optimizer, regime_funcs, 'approx_1_fun', initial_points, tau, c, final_time, skip_initial_point,
-            dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoints, seed, device, verbose=verbose
         ), None
 
 def _run_1st_order_balistic(
@@ -287,6 +268,7 @@ def _run_1st_order_balistic(
     batch_size: int,
     epsilon: float,
     sigma_value: float,
+    checkpoints: torch.Tensor,
     seed: int,
     device: str = 'cpu',
     verbose: bool = False
@@ -306,28 +288,22 @@ def _run_1st_order_balistic(
     res_cont_1 = torchsde.sdeint(sde1, initial_points.unsqueeze(0).expand(batch_size, -1), ts, method='euler', dt=tau**2).permute(1, 0, 2)
     
     # Compute losses for deterministic with batch processing
-    theta_1_order, final_distribution_1_order_det = processing_outputs(res_cont_1[:, :, :dim_weights])
-    v_1_order, _ = processing_outputs(res_cont_1[:, :, dim_weights: 2*dim_weights])
-    if optimizer == 'Adam':
-        m_1_order, _ = processing_outputs(res_cont_1[:, :, 2*dim_weights:])
+    res_runs = processing_outputs_caller(res_cont_1, dim_weights, checkpoints=checkpoints, optimizer=optimizer)
     t1 = time.time()
 
     res_1_order_det = {
-        'theta_mean': theta_1_order.to('cpu').squeeze(1),
-        'v_mean': v_1_order.to('cpu').squeeze(1),
-        'final_distribution': final_distribution_1_order_det.to('cpu'),
         'time_steps': ts.cpu(),
         'time_elapsed': t1 - t0,
         'n_runs': 1
     }
-    if optimizer == 'Adam':
-        res_1_order_det['m_mean'] = m_1_order.to('cpu').squeeze(1)
+    res_1_order_det.update(res_runs)
+
     print("[1ST ORDER SDE] Deterministic simulation completed.")
 
     # Stochastic simulations
     res_1_order_stoc = run_sde_simulations(
             poly, optimizer, regime_funcs, 'approx_1_fun', initial_points, tau, c, final_time, skip_initial_point,
-            dim_weights, num_runs, batch_size, epsilon, sigma_value, seed, device, verbose=verbose
+            dim_weights, num_runs, batch_size, epsilon, sigma_value, checkpoints, seed, device, verbose=verbose
         )
     
     print("[1ST ORDER SDE] Stochastic simulations completed.\n")
@@ -340,6 +316,7 @@ def run_experiment_configuration(
     sigma_value: float,
     points: list,
     final_time: float,
+    checkpoints: torch.Tensor,
     initial_points_before_disc: torch.Tensor = None,
     epsilon: float = 0.1
 ) -> None:
@@ -399,7 +376,7 @@ def run_experiment_configuration(
     res_disc = run_discrete_simulations(
         poly, args.optimizer, regime_funcs, noise, tau, beta, args.c, num_steps, 
         initial_points_before_disc, args.skip_initial_point, epsilon, args.num_runs, args.batch_size,
-        dim_weights, args.seed_disc, args.verbose
+        dim_weights, checkpoints, args.seed_disc, args.verbose
     )
     initial_points = res_disc['initial_point'].to(args.device)
     # Run 1st order SDE simulations
@@ -408,7 +385,7 @@ def run_experiment_configuration(
         res_1_order_stoc, res_1_order_det = run_1st_order_sde_simulations(
             args.regime, args.optimizer, poly, regime_funcs, initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
-            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_1st, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, checkpoints, args.seed_1st, args.device, args.verbose
         )
 
     # Run 2nd order SDE simulations
@@ -416,7 +393,7 @@ def run_experiment_configuration(
         res_2_order = run_sde_simulations(
             poly, args.optimizer, regime_funcs, 'approx_2_fun', initial_points, tau, args.c, final_time,
             args.skip_initial_point, dim_weights,
-            args.num_runs, args.batch_size, epsilon, sigma_value, args.seed_2nd, args.device, args.verbose
+            args.num_runs, args.batch_size, epsilon, sigma_value, checkpoints, args.seed_2nd, args.device, args.verbose
         )
     
     t1 = time.time()
@@ -453,55 +430,7 @@ def run_experiment_configuration(
 
     # wandb logging
     if args.wandb:
-        config = vars(args).copy()
-        config.update({'initial point bf disc' : initial_points_before_disc.item()})
-   
-        wandb.init(
-            project=args.name_project,
-            entity='Effective-continuous-equations',
-            name=f'Noise{args.noise_level}_{args.optimizer}{args.regime}_{initial_points_before_disc.item():.2f}_sigma{sigma_value:.2f}_BatchSize{args.batch_size_simulation}_tau{tau}_c{args.c}_time{final_time}',
-            config=config,
-            notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
-            save_code=True
-        )
-
-        for sim in final_results['simulation keys']:
-            artifact = wandb.Artifact(f"final_results_tau_{tau}_sigma_{sigma_value}", type="results")
-            artifact.add_file(os.path.join(result_dir, f'results_regime{args.regime}_tau{tau}_c{args.c}.pt'))
-            wandb.log_artifact(artifact)
-            wandb.log({f"Barplot/time_elapsed_for_{sim}": final_results[sim]['time_elapsed'], 'runs': effective_runs})
-            ts = final_results[sim]['time_steps'].numpy()
-            for t in range(len(ts)):
-                theta_val = final_results[sim]['theta_mean'][t].item()
-                v_val = final_results[sim]['v_mean'][t].item()
-                
-                wandb.log({
-                    f"theta_{sim}": theta_val,
-                    f"v_{sim}": v_val,
-                    "time": ts[t]
-                })
-
-
-            final_distribution = final_results[sim]['final_distribution'].cpu().numpy().flatten()
-            positive = (final_distribution >= 0).sum()
-            negative = (final_distribution < 0).sum()
-            wandb.log({
-                f"barplot/final_theta_positive_fraction_{sim}": positive / final_distribution.shape[0],
-                f"barplot/final_theta_negative_fraction_{sim}": negative / final_distribution.shape[0]
-            })
-      
-
-            # Log final distributions as histograms to wandb
-            fd = final_results[sim]['final_distribution'].cpu().numpy().flatten()
-            table = wandb.Table(data=[[v] for v in fd], columns=["value"])
-            wandb.log({
-                f"Histogram/final_theta_distribution_{sim}":
-                    wandb.plot.histogram(table, "value", title=f"{final_results['regime']} {sim} Final Distribution")
-            })
-
-        plot_poly_result(final_results, poly, tau, result_dir, args)
-
-        wandb.finish()
+        log_to_wandb(final_results, args, initial_points_before_disc, sigma_value, result_dir, tau, poly, effective_runs, final_time)
 
     print(f"[tau={tau}] Execution time: {t1-t0:.2f} seconds\n")
     
@@ -517,6 +446,7 @@ def main():
     print(f"Number of runs: {args.num_runs}")
     
     # Run experiments for all parameter combinations
+    checkpoints = torch.tensor([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     for tau in args.tau_list:
         print(args.batch_size_simulation)
         if args.sigma < 0 and args.batch_size_simulation < 0:
@@ -527,13 +457,13 @@ def main():
             args.batch_size_simulation = get_batch_size(args.sigma, tau, args.regime)
         else:
             sigma_aux = get_sigma(args.batch_size_simulation, tau, args.regime)
-            assert sigma_aux == args.sigma, f"Provided sigma {args.sigma} does not match computed sigma {sigma_aux} for batch size {args.batch_size_simulation} and tau {tau} in regime {args.regime}."
+            assert torch.isclose(torch.tensor(sigma_aux), torch.tensor(args.sigma), atol=1e-2), f"Provided sigma {args.sigma} does not match computed sigma {sigma_aux} for batch size {args.batch_size_simulation} and tau {tau} in regime {args.regime}."
 
         for initial_point in args.initial_points:
             initial_points_before_disc = torch.tensor([initial_point])
             final_time = args.final_time
             run_experiment_configuration(
-                args, tau, args.sigma, args.points, final_time=final_time, initial_points_before_disc=initial_points_before_disc, epsilon = args.epsilon
+                args, tau, args.sigma, args.points, final_time=final_time, checkpoints=checkpoints, initial_points_before_disc=initial_points_before_disc, epsilon = args.epsilon
             )
     
     print("All experiments completed successfully!")
@@ -542,33 +472,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-"""
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 0; 
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 0;
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --noise_level 0; 
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 0; 
-python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --noise_level 0;
-python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 0; 
-
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 0.25
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 0.25
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --noise_level 0.25
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 0.25
-python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --noise_level 0.25
-python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 0.25
-
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 1
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 1
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --noise_level 1
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 1
-python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --noise_level 1
-python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 1
-
-python -m Poly.main --regime batch_equivalent --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 4
-python -m Poly.main --regime batch_equivalent --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 4
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma 0.07 --batch-size-simulation -1 --noise_level 4
-python -m Poly.main --regime balistic --optimizer RMSProp --sigma -1 --batch-size-simulation 10 --noise_level 4
-python -m Poly.main --regime balistic --optimizer Adam --sigma 0.07 --batch-size-simulation -1 --noise_level 4
-python -m Poly.main --regime balistic --optimizer Adam --sigma -1 --batch-size-simulation 10 --noise_level 4
-"""

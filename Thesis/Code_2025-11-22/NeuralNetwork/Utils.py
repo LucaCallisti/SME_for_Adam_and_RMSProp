@@ -205,33 +205,22 @@ def load_and_preprocess_data(dataset, test_size: float = 0.2, random_state: int 
         mean = np.array([0.4914, 0.4822, 0.4465]).reshape(1, 3, 1, 1)
         std = np.array([0.2023, 0.1994, 0.2010]).reshape(1, 3, 1, 1)
         X = (X - mean) / std
-
-    stratify = y if dataset in ['BreastCancer', 'MNIST', 'CIFAR10'] else None
-    
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=test_size, random_state=random_state, stratify=stratify
-    )
     
     if dataset in ['Housing', 'BreastCancer']:
         scaler_X = StandardScaler()
-        X_train = scaler_X.fit_transform(X_train)
-        X_val = scaler_X.transform(X_val)
+        X = scaler_X.fit_transform(X)
     
     if dataset == 'Housing':
         scaler_y = StandardScaler()
-        y_train = scaler_y.fit_transform(y_train)
-        y_val = scaler_y.transform(y_val)
+        y = scaler_y.fit_transform(y)
         
-    X_train = torch.tensor(X_train, dtype=torch.float32)
-    X_val = torch.tensor(X_val, dtype=torch.float32)
+    X_train = torch.tensor(X, dtype=torch.float32)
+    y_train = torch.tensor(y, dtype=torch.float32)
     
-    y_train = torch.tensor(y_train, dtype=torch.float32)
-    y_val = torch.tensor(y_val, dtype=torch.float32)
-    
-    print(f"Dataset loaded: {X_train.shape[0]} training samples, {X_val.shape[0]} validation samples")
+    print(f"Dataset loaded: {X_train.shape[0]} training samples")
     print(f"X shape: {X_train.shape}, y shape: {y_train.shape}")
     
-    return X_train, X_val, y_train, y_val
+    return X_train, y_train
 
 def get_parameters(model_type):
     if model_type == 'ShallowNN':
@@ -244,9 +233,9 @@ def get_parameters(model_type):
     elif model_type == 'MLP':       # https://arxiv.org/pdf/2411.15958 F.3 RMSprop: SDE validation, DNN on Breast Cancer Dataset
         tau = 0.001
         sigma = 0.01
-        final_time = 0.2
+        final_time = 1.5
         num_runs = 16
-        batch_size = 16
+        batch_size = 8
         c = 5               # to get beta = 0.9995
         c1 = 100            # to get beta1 = 0.99
         c2 = 5              # to get beta2 = 0.9995      # Nel paper è 0.999 ma lo imposto a 0.9995 per coerenza con beta 
@@ -259,4 +248,5 @@ def get_parameters(model_type):
         c = 1               # to get beta = 0.9999
         c1 = 100            # to get beta1 = 0.99   
         c2 = 1             # to get beta2 = 0.9999
+
     return tau, sigma, final_time, num_runs, batch_size, c, c1, c2

@@ -41,7 +41,7 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--c-1', type=float, default=1, help='C 1 parameter for Adam optimizer')
     train_group.add_argument('--c-2', type=float, default=0.5, help='C 2 parameter for Adam optimizer')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
-    train_group.add_argument('--skip-initial-point', type=int, default=2, help='Number of initial points to skip in analysis')
+    train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')
     # train_group.add_argument('--device', type=str, default='cpu', help='Device to run simulations on (cpu or cuda)')
     train_group.add_argument('--batch-size', type=int, default=16, help='Batch size for training')
@@ -110,7 +110,7 @@ def run_sde_simulations(
         dim_result = dim_weights * 3  # theta, m, v
     elif optimizer == 'RMSProp':
         dim_result = dim_weights * 2  # theta, v
-    loss, val_loss, runs = torch.zeros(num_batched_runs, batch_size, num_steps), torch.zeros(num_batched_runs, batch_size, num_steps), torch.zeros(num_batched_runs, batch_size, num_steps, dim_result), 
+    loss, runs = torch.zeros(num_batched_runs, batch_size, num_steps), torch.zeros(num_batched_runs, batch_size, num_steps, dim_result), 
     model = model_factory()
 
     y0_batched = y0.unsqueeze(0).expand(batch_size, -1).to(device)
@@ -139,21 +139,20 @@ def run_sde_simulations(
 
         # Compute validation loss with batch processing
         for t in range(num_steps):
-            val_loss[run, : , t] = model.val_loss_batch(res_cont[:, t, :dim_weights])
             loss[run, : , t] = model.loss_batch(res_cont[:, t, :dim_weights])
     
     # Aggregate results
     loss = loss.reshape(-1, loss.shape[2])
-    val_loss = val_loss.reshape(-1, val_loss.shape[2])
     res_loss = process_results(loss, checkpoints = checkpoint, variable='Loss', Norm_bool=False)
-    res_val_loss = process_results(val_loss, checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
     res = res_loss
-    res.update(res_val_loss)
 
     runs =  runs.reshape(-1, runs.shape[2], runs.shape[3])
     res_theta = process_results(runs[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
     res.update(res_theta)
-    res_v = process_results(runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    if optimizer == 'Adam':
+        res_v = process_results(runs[:, :, 2 * dim_weights:], checkpoints = checkpoint, variable='v')
+    elif optimizer == 'RMSProp':
+        res_v = process_results(runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
     res.update(res_v)
     if optimizer == 'Adam':
         res_m = process_results(runs[:, :, dim_weights: 2*dim_weights], checkpoints = checkpoint, variable='m')
@@ -171,7 +170,7 @@ def run_sde_simulations(
     res.update(additional_info)
     
     print(f"[{which_approximation}] Simulations completed.\n")
-    del model, runs, loss, val_loss, y0_batched, res_cont, sde
+    del model, runs, loss, y0_batched, res_cont, sde
     torch.cuda.empty_cache()
     return res
 
@@ -199,7 +198,7 @@ def run_discrete_simulations(
     Run discrete RMSProp simulations with batch processing.
     
     Returns:
-        Dict of (Loss_disc, Val_loss_disc, theta_mean_disc, v_mean_disc, y0)
+        Dict of (Loss_disc, theta_mean_disc, v_mean_disc, y0)
     """
     print("[DISCRETE] Starting discrete simulations...")
     set_seed(seed)
@@ -210,7 +209,7 @@ def run_discrete_simulations(
         dim_result = dim_weights * 3  # theta, m, v
     elif optimizer == 'RMSProp':
         dim_result = dim_weights * 2  # theta, v
-    Loss_disc, Val_loss_disc, discrete_runs = torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point), torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point), torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point, dim_result)
+    Loss_disc, discrete_runs = torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point),  torch.zeros(num_batched_runs, batch_size, num_steps - skip_initial_point, dim_result)
     model = model_factory()
     y0 = None
     
@@ -229,22 +228,17 @@ def run_discrete_simulations(
         if y0 is None:
             y0 = res[0, skip_initial_point, :]
 
-        # Compute validation loss with batch processing
-        for t in range(num_steps - skip_initial_point):
-            val_loss = model.val_loss_batch(res[:, t, :dim_weights])
-            Val_loss_disc[run, : , t] = val_loss
-        
     # Aggregate results
     discrete_runs = discrete_runs.reshape(-1, discrete_runs.shape[2], discrete_runs.shape[3])
     Loss_disc = Loss_disc.reshape(-1, Loss_disc.shape[2])
-    Val_loss_disc = Val_loss_disc.reshape(-1, Val_loss_disc.shape[2])
     res_loss = process_results(Loss_disc, checkpoints = checkpoint, variable='Loss', Norm_bool=False)
-    res_val_loss = process_results(Val_loss_disc,checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
     res = res_loss
-    res.update(res_val_loss)
     
     res_theta = process_results(discrete_runs[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
-    res_v = process_results(discrete_runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    if optimizer == 'RMSProp':
+        res_v = process_results(discrete_runs[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    elif optimizer == 'Adam':
+        res_v = process_results(discrete_runs[:, :, 2 * dim_weights:], checkpoints = checkpoint, variable='v')
     res.update(res_theta)
     res.update(res_v)
     if optimizer == 'Adam':
@@ -262,7 +256,7 @@ def run_discrete_simulations(
     res.update(additional_info)
 
     print("[DISCRETE] Simulations completed.\n")
-    del model, loss_values_disc, discrete_runs, Loss_disc, Val_loss_disc
+    del model, loss_values_disc, discrete_runs, Loss_disc
     torch.cuda.empty_cache()
     return res
 
@@ -345,18 +339,18 @@ def _run_1st_order_balistic(
     # Compute losses for deterministic with batch processing
     theta_batch = res_cont_1[0, :, :dim_weights].to(device)
     loss_1_order = model.loss_batch(theta_batch)
-    val_loss_1_order = model.val_loss_batch(theta_batch)
     res_loss = process_results(loss_1_order.unsqueeze(0), checkpoints = checkpoint, variable='Loss', Norm_bool=False)
-    res_val_loss = process_results(val_loss_1_order.unsqueeze(0), checkpoints = checkpoint, variable='Val_loss', Norm_bool=False)
     res = res_loss
-    res.update(res_val_loss)
 
     res_theta = process_results(res_cont_1[:, :, :dim_weights], checkpoints = checkpoint, variable='theta')
-    res_v = process_results(res_cont_1[:, :, dim_weights:2*dim_weights], checkpoints = checkpoint, variable='v')
+    if optimizer == 'RMSProp':
+        res_v = process_results(res_cont_1[:, :, dim_weights:], checkpoints = checkpoint, variable='v')
+    elif optimizer == 'Adam':
+        res_v = process_results(res_cont_1[:, :, 2 * dim_weights:], checkpoints = checkpoint, variable='v')
     res.update(res_theta)
     res.update(res_v)
     if optimizer == 'Adam':
-        res_m = process_results(res_cont_1[:, :, 2*dim_weights:], checkpoints = checkpoint, variable='m')
+        res_m = process_results(res_cont_1[:, :, dim_weights:2*dim_weights], checkpoints = checkpoint, variable='m')
         res.update(res_m)
     t1 = time.time()
     additional_info = {
@@ -368,7 +362,7 @@ def _run_1st_order_balistic(
     res.update(additional_info)
     print("[1ST ORDER SDE] Deterministic simulation completed.")
     
-    del model, sde1, res_cont_1, theta_batch, loss_1_order, val_loss_1_order
+    del model, sde1, res_cont_1, theta_batch, loss_1_order
     torch.cuda.empty_cache()
 
     # Stochastic simulations

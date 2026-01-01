@@ -187,12 +187,11 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
         if loss_bool:
             Loss_values[:, step] = funz.loss_batch(x)
 
+
         grad = funz.noisy_grad_batcheq(x, gamma, tau)
 
         path_v[:, step+1] = beta * v + tau**2 * c * grad**2
         path_x[:, step+1] = x - tau * grad / (torch.sqrt(v) + epsilon)
-
-        # print(f'step {step}, {path_v[:, step][0].item():.6f}, {path_x[:, step][0].item():.6f}, {grad[0].item():.6f}')
 
         # path_v[:, step+1] = beta * v + lr**2 * c * torch.pow(expected_grad, 2) + lr * c * noise**2 + 2 * lr**(3/2) * c  * noise * expected_grad
         # path_x[:, step+1] = x - lr * expected_grad / (torch.sqrt(path_v[:, step]) + epsilon) - torch.sqrt(lr) * noise / (torch.sqrt(path_v[:, step]) + epsilon) 
@@ -201,7 +200,7 @@ def Discrete_RMProp_batch_eq_regime(funz, noise, tau, beta, c, num_steps, x_0, s
             print(f'time between 10000 steps: {time.time() - start:.2f} seconds at time {step * tau:.2f}')
             start = time.time()
 
-        if (verbose and tau * step > temp) or True:
+        if (verbose and tau * step > temp):
             temp += 1
             print(f'Step {step}, v: {v.mean().item():.4f}, theta: {x.mean().item():.4f} {path_x[:, step+1].mean().item():.4f}, grad: {grad.mean().item():.4f}, Delta x { (tau * grad / (torch.sqrt(v) + epsilon)).mean().item():.4f}, epsilon {epsilon}')
     if loss_bool:

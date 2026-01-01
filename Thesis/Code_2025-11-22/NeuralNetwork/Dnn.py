@@ -33,52 +33,32 @@ class base_nn:
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
-            loss_value = torch.mean((y_pred - self.y_val) ** 2)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_input,))
+            loss_value = torch.mean((y_pred - self.y_target) ** 2)
             return loss_value
         return loss_single
     
     def loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
 
         loss_single = self.get_loss_batch_fun()
         
         # Vmap sul primo asse di theta_batch
-        batched_loss = F.vmap(loss_single)
+        batched_loss = torch.func.vmap(loss_single)
         self.loss_batch_cached = batched_loss(theta_batch)
         return self.loss_batch_cached
-    
-    def val_loss_batch(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
-        
-        loss_single = self.get_loss_batch_fun()
-        
-        # Vmap sul primo asse di theta_batch
-        batched_loss = F.vmap(loss_single)
-        val_loss = batched_loss(theta_batch)
-        return val_loss
+
     
     def noisy_grad_balistic(self, theta: torch.Tensor, gamma: torch.Tensor) -> torch.Tensor:
         return self.grad(theta) + gamma 
     def noisy_grad_batcheq(self, theta: torch.Tensor, gamma: torch.Tensor, tau: float) -> torch.Tensor:
         return self.grad(theta) + gamma / tau**0.5
     def grad(self, theta_batch: torch.Tensor) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+. Usa BatchParameterNetwork invece.")
 
         loss_single = self.get_loss_batch_fun()
-        grad_fn = F.grad(loss_single)
+        grad_fn = torch.func.grad(loss_single)
 
         # Vmap sul primo asse di theta_batch
-        batched_grad = F.vmap(grad_fn)
+        batched_grad = torch.func.vmap(grad_fn)
         self.grad_batch = batched_grad(theta_batch)
 
         # Calcola anche la loss se non è stata calcolata
@@ -88,11 +68,6 @@ class base_nn:
         return self.grad_batch
     
     def hessian(self, theta_batch: torch.Tensor = None) -> torch.Tensor:
-        try:
-            import torch.func as F
-        except ImportError:
-            raise RuntimeError("torch.func richiede PyTorch 2.0+.")
-        
         if theta_batch is None:
             raise ValueError("Specifica theta_batch")
         assert theta_batch.ndim == 2, "theta_batch deve essere (B, total_params)"
@@ -101,16 +76,16 @@ class base_nn:
         
         # Definisci la funzione gradiente
         def grad_fn(theta_vec):
-            return F.grad(loss_single)(theta_vec)
+            return torch.func.grad(loss_single)(theta_vec)
         
         # Calcola l'Hessiano come Jacobiano del gradiente
         def hessian_single(theta_vec):
             # jacobian restituisce la matrice Jacobiana (total_params, total_params)
-            hess = F.jacrev(grad_fn)(theta_vec)
+            hess = torch.func.jacrev(grad_fn)(theta_vec)
             return hess
         
         # Vmap per calcolare l'Hessiano per ogni campione del batch
-        batched_hessian = F.vmap(hessian_single)
+        batched_hessian = torch.func.vmap(hessian_single)
         hessian_batch = batched_hessian(theta_batch)
         
         self.hessian_batch = hessian_batch
@@ -156,12 +131,9 @@ class ShallowNN(base_nn):
 
     def __init__(self, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
         # Creating datasets
-        X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = 'Housing', test_size = 0.2)
+        X_train, y_train = load_and_preprocess_data(dataset = 'Housing', test_size = 0.2)
         self.x_input = X_train.to(device)
         self.y_target = y_train.to(device)
-
-        self.x_val = X_val.to(device)
-        self.y_val = y_val.to(device)
         
         # Inizializing layers
         self.input_dim = X_train.shape[1]
@@ -197,8 +169,8 @@ class ShallowNN(base_nn):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
-            loss_value = torch.mean((y_pred - self.y_val) ** 2)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_input,))
+            loss_value = torch.mean((y_pred - self.y_target) ** 2)
             return loss_value
         return loss_single
 
@@ -212,12 +184,9 @@ class MLP(base_nn):
 
     def __init__(self, device: str = 'cuda' if torch.cuda.is_available() else 'cpu'):
          # Creating datasets
-        X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = 'BreastCancer', test_size = 0.2)
+        X_train, y_train = load_and_preprocess_data(dataset = 'BreastCancer', test_size = 0.2)
         self.x_input = X_train.to(device)
         self.y_target = y_train.squeeze().long().to(device)
-
-        self.x_val = X_val.to(device)
-        self.y_val = y_val.squeeze().long().to(device)
         
         # Inizializing layers
         self.input_dim = X_train.shape[1]
@@ -265,10 +234,23 @@ class MLP(base_nn):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
-            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_val)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_input,))
+            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_target)
             return loss_value
         return loss_single
+    
+    def print_accuracy(self, theta_vec):
+        def aux_function(theta_vec):
+            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
+            params_dict = {k: v[0] for k, v in params_dict.items()}
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_input,))
+            predicted_classes = torch.argmax(y_pred, dim=1)
+            accuracy = (predicted_classes == self.y_target).float().mean()
+            return accuracy
+
+        batched_accuracy = torch.func.vmap(aux_function)
+        accuracy_batched = batched_accuracy(theta_vec)
+        print(f'Accuracy: {accuracy_batched.mean().item():.4f}')
 
 
 class ResidualBlock(nn.Module):
@@ -295,13 +277,18 @@ class ResNet(base_nn):
             output_dim = 10
         else:
             raise ValueError(f"Dataset {dataset} not supported for ResNet.")
-        X_train, X_val, y_train, y_val = load_and_preprocess_data(dataset = dataset, test_size = 0.2)
+        X_train, y_train = load_and_preprocess_data(dataset = dataset, test_size = 0.2)
         self.x_input = X_train.to(device)
         self.y_target = y_train.squeeze().long().to(device)
 
-        self.x_val = X_val.to(device)
-        self.y_val = y_val.squeeze().long().to(device)
-        
+        self.Batch_for_hessian = 1000
+        print("Using Batch size for Hessian:", self.Batch_for_hessian)
+        cutoff = (self.x_input.shape[0] // self.Batch_for_hessian) * self.Batch_for_hessian
+        self.x_input = self.x_input[:cutoff]
+        self.y_target = self.y_target[:cutoff]
+        self.x_input_reshaped = self.x_input.reshape(self.Batch_for_hessian, -1, *self.x_input.shape[1:])
+        self.y_target_reshaped = self.y_target.reshape(self.Batch_for_hessian, -1)
+
         # Inizializing layers
         hidden_channels = 16
         self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=hidden_channels, kernel_size=3, stride=1, padding=1).to(device)
@@ -353,12 +340,47 @@ class ResNet(base_nn):
         def loss_single(theta_vec):
             params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
             params_dict = {k: v[0] for k, v in params_dict.items()}
-            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_val,))
-            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_val)
+            y_pred = torch.func.functional_call(self.network, params_dict, (self.x_input,))
+            loss_value = torch.nn.functional.cross_entropy(y_pred, self.y_target)
             return loss_value
         return loss_single
     
+    def hessian(self, theta_batch: torch.Tensor = None) -> torch.Tensor:
+        if theta_batch is None:
+            raise ValueError("Specifica theta_batch")
+        assert theta_batch.ndim == 2, "theta_batch deve essere (B, total_params)"
+        
+        def loss_on_batch(theta_vec, x_batch, y_batch):
+            params_dict = self._unpack_parameters(theta_vec.unsqueeze(0))
+            params_dict = {k: v[0] for k, v in params_dict.items()}
+            
+            y_pred = torch.func.functional_call(self.network, params_dict, (x_batch,))
+            loss_value = torch.nn.functional.cross_entropy(y_pred, y_batch)
+            return loss_value
+        
+        total_hessian = 0
+        for i in range(self.Batch_for_hessian):
+            x_b = self.x_input_reshaped[i]
+            y_b = self.y_target_reshaped[i]
 
+            # Definisci la funzione gradiente
+            def grad_fn(theta_vec):
+                return torch.func.grad(loss_on_batch)(theta_vec, x_b, y_b)
+            
+            # Calcola l'Hessiano come Jacobiano del gradiente
+            def hessian_single(theta_vec):
+                # jacobian restituisce la matrice Jacobiana (total_params, total_params)
+                hess = torch.func.jacrev(grad_fn)(theta_vec)
+                return hess
+            
+            # Vmap per calcolare l'Hessiano per ogni campione del batch
+            batched_hessian = torch.func.vmap(hessian_single)
+            hessian_batch = batched_hessian(theta_batch)
+            total_hessian += hessian_batch
+        
+        del hessian_step
+        self.hessian_batch = total_hessian / self.Batch_for_hessian
+        return self.hessian_batch
 
 
 

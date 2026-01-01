@@ -45,12 +45,8 @@ class Adam_SDE_2order_balistic_regime(SDE_basic):
         # Theta coefficient
         denom = 1/(torch.sqrt(v_reg) + self.eps * torch.sqrt(self.gamma_2(t)))
         coef_theta = self.b_0_theta(t, denom) + self.eta * self.b_1_theta(t, denom, v_reg, v_reg_grad)
-
-        coef_m = self.b_0_m() + self.eta * self.b_1_m(t, denom)
-        # coef_m = self.b_0_m()
-    
+        coef_m = self.b_0_m() + self.eta * self.b_1_m(t, denom)    
         coef_v = self.b_0_v() + self.eta * self.b_1_v(t, denom)
-        # coef_v = self.b_0_v() 
 
         self.drift = torch.concat((coef_theta, coef_m, coef_v), dim = 1)
         self.is_it_Nan(self.drift, x, t, 'drift 2 order')

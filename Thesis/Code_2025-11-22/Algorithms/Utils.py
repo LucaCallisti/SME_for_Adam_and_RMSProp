@@ -72,10 +72,10 @@ class SDE_basic(torchsde.SDEIto):
         self.i += 1
     def Verbose(self, t):
 
-        if (self.verbose and t > self.t_verbose) or True: 
+        if (self.verbose and t > self.t_verbose): 
             self.chronometer(t)
             print(f't: {t:.1f}', end='\r')
-            self.t_verbose = t + 1
+            self.t_verbose = t + 0.1
             # try:
             #     print(f't: {t:.1f}, theta {self.theta.mean().item():.3f}, v {self.v.mean().item():.3f}, drift {self.drift.mean():.3f}, self.diag_Sigma {self.diag_Sigma.mean().item():.3f}' )
             # except:
@@ -173,7 +173,7 @@ def get_regime_functions(regime: str, optimizer: str) -> Dict[str, Any]:
 
 def get_batch_size(sigma, tau, regime):
     if regime == 'balistic':
-        b_size = int( sigma**(-2) / 10 )
+        b_size = int( sigma**(-2) / 1 )
     elif regime == 'batch_equivalent':
         b_size = int( tau * sigma**(-2) )
     else:
@@ -182,8 +182,8 @@ def get_batch_size(sigma, tau, regime):
     return b_size
 def get_sigma(batch_size, tau, regime):
     if regime == 'balistic':
-        return (10 * batch_size)**(-0.5)
+        return (1 * batch_size)**(-0.5)
     elif regime == 'batch_equivalent':
-        return (batch_size / tau)**(-0.5)
+        return (tau / batch_size)**(0.5)
     else:
         raise ValueError(f"Unknown regime: {regime}")
