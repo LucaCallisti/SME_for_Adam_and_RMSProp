@@ -37,8 +37,9 @@ class SDE_basic(torchsde.SDEIto):
         self.f_grad_square = torch.pow(self.f_grad, 2)   
 
         if self.eq == 'RMSProp' and self.regime == 'batch_equivalent':
-            self.term_b_1_theta_RMSProp_BatchEq = self.sigma_value**2 * self.fun.term_b1_RMSProp_BatchEq(theta)
-            # To do da fare assert
+            v_reg = self.regularizer.regulariz_function(self.v)
+            denom = 1/(torch.sqrt(v_reg) + self.eps)
+            self.term_b_1_theta_RMSProp_BatchEq = self.sigma_value**2 * self.fun.term_b1_RMSProp_BatchEq(theta, denom) * denom
 
         if self.constant_noise is False:
             self.Sigma = self.sigma_value **2 * self.fun.Sigma(theta)

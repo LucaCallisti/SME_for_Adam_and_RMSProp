@@ -55,9 +55,9 @@ class RMSprop_SDE_2order_batch_eq_regime(SDE_basic):
     def b_1_theta(self, denom, v_reg, v_reg_grad):
         OuterProduct = torch.einsum('ki,kj->kij', denom, denom)
         first_term_b_1_theta = torch.bmm(self.f_hessian*OuterProduct, self.f_grad.unsqueeze(2)).squeeze(2)+ self.c* 0.5* (denom**3) * (self.f_grad  * v_reg_grad) * (self.diag_Sigma - self.v)
-        additional_term = 2 * torch.bmm( torch.bmm(torch.diag_embed(denom), self.term_b_1_theta_RMSProp_BatchEq), denom.unsqueeze(2)**2)
-
-        return  - 0.5 * (first_term_b_1_theta + additional_term.squeeze(2))
+        # additional_term = 2 * torch.bmm( torch.bmm(torch.diag_embed(denom), self.term_b_1_theta_RMSProp_BatchEq), denom.unsqueeze(2)**2)
+        additional_term = 2 * self.term_b_1_theta_RMSProp_BatchEq 
+        return  - 0.5 * (first_term_b_1_theta + additional_term)
     def b_0_v(self):
         return self.c * (self.diag_Sigma - self.v)
     def b_1_v(self, denom):

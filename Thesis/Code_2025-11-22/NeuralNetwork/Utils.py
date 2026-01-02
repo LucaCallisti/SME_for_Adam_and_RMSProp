@@ -229,7 +229,7 @@ def get_parameters(model_type):
         sigma = 0.01
         final_time = 1.5
         num_runs = 16
-        batch_size = 8
+        batch_size = 4
         c = 5               # to get beta = 0.9995
         c1 = 100            # to get beta1 = 0.99
         c2 = 5              # to get beta2 = 0.9995      # Nel paper è 0.999 ma lo imposto a 0.9995 per coerenza con beta 

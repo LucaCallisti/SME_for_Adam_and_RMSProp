@@ -65,7 +65,7 @@ class base_nn:
         if self.loss_batch_cached is None:
             self.loss_batch_cached = self.loss_batch(theta_batch)
 
-        return self.grad_batch
+        return self.grad_batch.detach()
     
     def hessian(self, theta_batch: torch.Tensor = None) -> torch.Tensor:
         if theta_batch is None:
@@ -89,22 +89,42 @@ class base_nn:
         hessian_batch = batched_hessian(theta_batch)
         
         self.hessian_batch = hessian_batch
-        return hessian_batch
+        return hessian_batch.detach()
     
     def Sigma_sqrt(self, theta):
-        return torch.eye(self.grad_batch.shape[1], device=theta.device).unsqueeze(0).expand(theta.shape[0], -1, -1)
+        return torch.eye(self.grad_batch.shape[1], device=theta.device).unsqueeze(0).expand(theta.shape[0], -1, -1).detach()
     
     def Diag_sigma(self, theta):
-        return torch.ones_like(self.grad_batch)
+        return torch.ones_like(self.grad_batch).detach()
 
     def square_root_var_z_squared(self, theta):
-        return (2**0.5 * torch.eye(self.grad_batch.shape[1], device=theta.device)).unsqueeze(0).expand(theta.shape[0], -1, -1)
+        return (2**0.5 * torch.eye(self.grad_batch.shape[1], device=theta.device)).unsqueeze(0).expand(theta.shape[0], -1, -1).detach()
 
-    def term_b1_RMSProp_BatchEq(self, theta):
-        result = self.hessian_batch * torch.diag_embed(self.grad_batch) / (self.loss_batch_cached**0.5).view(-1, 1, 1) - torch.einsum('bi,bj->bij', self.grad_batch, self.grad_batch**2) / (4 * self.loss_batch_cached**1.5).view(-1, 1, 1)
-        result[:, :, -1] = torch.zeros_like(result[:, :, -1])  
-        return result
+    def term_b1_RMSProp_BatchEq(self, theta_batch, denom):
+        # result = self.hessian_batch * torch.diag_embed(self.grad_batch) / (self.loss_batch_cached**0.5).view(-1, 1, 1) - torch.einsum('bi,bj->bij', self.grad_batch, self.grad_batch**2) / (4 * self.loss_batch_cached**1.5).view(-1, 1, 1)
+        # result[:, :, -1] = torch.zeros_like(result[:, :, -1])  
+        
+        loss_single = self.get_loss_batch_fun()
+        def grad_fn(theta_vec):
+            return torch.func.grad(loss_single)(theta_vec)
+        def diag_weighted_scalar(theta_vec, v_vec):
+            n_params = theta_vec.shape[0]
+            
+            def get_diag_element(idx):
+                all_indices = torch.arange(n_params, device=theta_vec.device)
+                basis_vec = (all_indices == idx).to(theta_vec.dtype)
+                _, col_i = torch.func.jvp(grad_fn, (theta_vec,), (basis_vec,))
+                return torch.sum(col_i * basis_vec)
+            indices = torch.arange(n_params, device=theta_vec.device)
+            hess_diag = torch.func.vmap(get_diag_element)(indices)
+            return torch.sum((v_vec ** 2) * hess_diag)
 
+        grad_of_diag_fn = torch.func.grad(diag_weighted_scalar, argnums=0)
+
+        batched_fn = torch.func.vmap(grad_of_diag_fn)
+
+        return batched_fn(theta_batch, denom).detach()
+    
     def _unpack_parameters(self, theta_batch: torch.Tensor) -> Dict[str, torch.Tensor]:
         """
         Converte theta_batch da (B, total_params) a dict di parametri con batch.
