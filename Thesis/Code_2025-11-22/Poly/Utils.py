@@ -76,6 +76,14 @@ def log_to_wandb(final_results, args, initial_points_before_disc, sigma_value, r
         notes='Comparison of discrete RMSProp with SDE approximations for shallow NN on California Housing dataset with comparison of loss, validation loss, norm of the theta and v and distribution of the final loss and final theta.',
         save_code=True
     )
+
+    # Log final results as artifact to wandb
+    save_path = os.path.join(result_dir, f'final_results_{args.regime}_tau{tau}_sigma{sigma_value}.pt')
+    torch.save(final_results, save_path)
+    artifact = wandb.Artifact(f"final_results_tau_{tau}_sigma_{sigma_value}", type="results")
+    artifact.add_file(save_path)
+    wandb.log_artifact(artifact)
+    
     def aux_plot_mean_and_std(title: str, final_results) -> None:
         sims = final_results['simulation keys']
         ts = final_results[sims[0]]['time_steps'].numpy()
@@ -107,6 +115,7 @@ def log_to_wandb(final_results, args, initial_points_before_disc, sigma_value, r
         plt.legend()
         wandb.log({f"{title}_plot":  wandb.Image(plt)})
         plt.close()
+
     aux_plot_mean_and_std('theta', final_results)
     aux_plot_mean_and_std('v', final_results)
     if args.optimizer == 'Adam':

@@ -46,7 +46,7 @@ def parse_arguments() -> argparse.Namespace:
     train_group.add_argument('--sigma', type=float, default=-1, help='Noise variance values to test')
     train_group.add_argument('--batch-size-simulation', type = int, default=-10, help='Batch size for simulations')
     train_group.add_argument('--num-runs', type=int, default=1024, help='Number of simulation runs for averaging')
-    train_group.add_argument('--final-time', type=float, default=1.0, help='Final time for SDE integration')
+    train_group.add_argument('--final-time', type=float, default=5.0, help='Final time for SDE integration')
     train_group.add_argument('--epsilon', type=float, default=0.1, help='Regularization epsilon for RMSProp')
     train_group.add_argument('--skip-initial-point', type=int, default=1, help='Number of initial points to skip in analysis')
     train_group.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu', help='Device to run simulations on (cpu or cuda)')

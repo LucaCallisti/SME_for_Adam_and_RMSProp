@@ -236,7 +236,7 @@ def get_parameters(model_type):
     elif model_type == 'ResNet':
         tau = 0.0001        # Preso da RMSProp
         sigma = 0.0001      # Preso da RMSProp
-        final_time = 0.05    # diverso da loro
+        final_time = 0.0005    # diverso da loro   # 0.05
         num_runs = 1
         batch_size = 1
         c = 1               # to get beta = 0.9999

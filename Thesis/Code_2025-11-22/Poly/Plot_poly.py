@@ -4,7 +4,7 @@ import os
 import torch
 import wandb
 
-def plot_poly_result(final_results, poly, tau, result_dir, args, only_last = True):
+def plot_poly_result(final_results, poly, tau, result_dir, args = None, only_last = False, to_plot = ['disc', '1_order_stoc', '2_order_stoc']):
     initial_before = final_results['initial_points_before_disc'].cpu().numpy()
     initial_after = final_results['initial_points_after_disc'][0].cpu().numpy()
 
@@ -27,7 +27,9 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, only_last = Tru
     f_initial_before = poly.f(torch.as_tensor(initial_before)).cpu().numpy() + vertical_scaling_factor
     f_initial_after = poly.f(torch.as_tensor(initial_after)).cpu().numpy() + vertical_scaling_factor
 
-    number_of_checkpoints = final_results['disc']['theta_distributions'].shape[1]
+    to_plot = [x for x in to_plot if x in final_results.keys()]
+
+    number_of_checkpoints = final_results[to_plot[0]]['theta_distributions'].shape[1]
     final_time = final_results['final_time']
     res_to_log = {}
     if only_last == False:
@@ -35,9 +37,12 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, only_last = Tru
     else:
         start_index = number_of_checkpoints - 1
     for i in range(start_index, number_of_checkpoints):
-        dist_disc = final_results['disc']['theta_distributions'][:, i].cpu().numpy().flatten()
-        dist_1st = final_results['1_order_stoc']['theta_distributions'][:, i].cpu().numpy().flatten() if '1_order_stoc' in final_results else None
-        dist_2nd = final_results['2_order_stoc']['theta_distributions'][:, i].cpu().numpy().flatten() if '2_order_stoc' in final_results else None
+        dist_to_plot = []
+        for sim in to_plot:
+            dist_to_plot.append(final_results[sim]['theta_distributions'][:, i].cpu().numpy().flatten())
+        # dist_disc = final_results['disc']['theta_distributions'][:, i].cpu().numpy().flatten()
+        # dist_1st = final_results['1_order_stoc']['theta_distributions'][:, i].cpu().numpy().flatten() if '1_order_stoc' in final_results else None
+        # dist_2nd = final_results['2_order_stoc']['theta_distributions'][:, i].cpu().numpy().flatten() if '2_order_stoc' in final_results else None
 
         # --- Plot ---
         fig, ax1 = plt.subplots(figsize=(10,6))
@@ -64,11 +69,16 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, only_last = Tru
 
         bins = 200
         # Moltiplichiamo gli istogrammi per il fattore di scala
-        ax2.hist(dist_disc, bins=bins, alpha=0.3, color='#000080', label='Final dist (disc)', weights=np.ones_like(dist_disc), density=True)
-        if dist_1st is not None:
-            ax2.hist(dist_1st, bins=bins, alpha=0.3, color='#FF8000', label='Final dist 1st', weights=np.ones_like(dist_1st), density=True)
-        if dist_2nd is not None:
-            ax2.hist(dist_2nd, bins=bins, alpha=0.3, color='#808000', label='Final dist 2nd', weights=np.ones_like(dist_2nd), density=True)
+        colors = ['#000080', '#FF8000', '#808000', '#800080', '#008080']
+        label = {'disc': 'Final dist (disc)', '1_order_stoc': 'Final dist 1st', '2_order_stoc': 'Final dist 2nd', '2_order_Balistic': 'Final dist 2nd Balistic', '2_order_BatchEq': 'Final dist 2nd BatchEq'}
+        for i, dist in enumerate(dist_to_plot):
+            ax2.hist(dist, bins=bins, alpha=0.3, color=colors[i], label=label[to_plot[i]], weights=np.ones_like(dist), density=True)
+
+        # ax2.hist(dist_disc, bins=bins, alpha=0.3, color='#000080', label='Final dist (disc)', weights=np.ones_like(dist_disc), density=True)
+        # if dist_1st is not None:
+        #     ax2.hist(dist_1st, bins=bins, alpha=0.3, color='#FF8000', label='Final dist 1st', weights=np.ones_like(dist_1st), density=True)
+        # if dist_2nd is not None:
+        #     ax2.hist(dist_2nd, bins=bins, alpha=0.3, color='#808000', label='Final dist 2nd', weights=np.ones_like(dist_2nd), density=True)
 
         ax2.set_ylim(0, 15)
         ax2.set_ylabel('Probability density')
@@ -79,5 +89,9 @@ def plot_poly_result(final_results, poly, tau, result_dir, args, only_last = Tru
         time = final_time * (i / (number_of_checkpoints-1))
         res_to_log[f"Distributions/Distribution_at_{time}"] =  wandb.Image(fig_path)
         plt.close(fig)
-    if args.wandb:
+
+    if args is not None:
+        if args.wandb:
+            wandb.log(res_to_log)
+    else:
         wandb.log(res_to_log)
