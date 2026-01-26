@@ -4,9 +4,8 @@ matplotlib
 seaborn
 torchsde
 wandb
-time
 argparse
 torchinfo
-sklearn
+scikit-learn
 torchvision
 pandas
