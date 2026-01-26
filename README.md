@@ -6,7 +6,7 @@ This repository contains Python implementations for comparing discrete optimizat
 - **Algorithms/**: Core implementations of Adam and RMSProp in different regimes.
 - **NeuralNetwork/**: Deep learning models, training scripts, and utilities.
 - **Poly/**: Polynomial function experiments and plotting.
-- **QuadraticFunction/**: Quadratic function experiments, SDE/ODE simulations, and utilities.
+- **QuadraticFunction/**: Quadratic function experiments, SDE simulations, and utilities.
 
 ## Requirements
 See `requirements.txt` for dependencies. All main packages are installed via pip:
