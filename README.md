@@ -13,21 +13,24 @@ See `requirements.txt` for dependencies. All main packages are installed via pip
 
 ## Usage
 1. Install dependencies:
-   ```bash
+   ```
    pip install -r requirements.txt
    ```
 2. Run experiments:
    - For quadratic function experiments:
      ```
-     bash QuadraticFunction/runs.sh
+     bash QuadraticFunction/runs.sh      # Linux/macOS
+     QuadraticFunction\runs.bat          # Windows
      ```
    - For polynomial experiments:
      ```
-     bash Poly/runs.sh
+     bash Poly/runs.sh                   # Linux/macOS
+     Poly\runs.bat                       # Windows
      ```
    - For neural network experiments:
      ```
-     bash NeuralNetwork/runs.sh
+     bash NeuralNetwork/runs.sh          # Linux/macOS
+     NeuralNetwork\runs.bat              # Windows
      ```
 
 ## License

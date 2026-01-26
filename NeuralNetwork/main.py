@@ -492,7 +492,7 @@ def run_experiment_configuration(
         beta = 1 - tau * args.c
         print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta}, SIGMA = {sigma_value}, epsilon {epsilon} ====================\n")
 
-    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_sigma_{sigma_value}_finaltime_{args.final_time}"
+    result_dir = os.path.normpath(os.path.join(args.results_dir, f"tau_{tau}_c_{args.c}_sigma_{sigma_value}_finaltime_{args.final_time}"))
     result_dir = os.path.join(result_dir, args.regime.replace(' ', '_'))
     os.makedirs(result_dir, exist_ok=True)
     
@@ -569,6 +569,8 @@ def main():
 
     global MODEL_NAME 
     MODEL_NAME = f'{args.model}+{args.regime}+{args.optimizer}'
+
+    args.results_dir = os.path.join(args.results_dir, args.model)
 
     if args.model == 'ShallowNN':
         def model_factory():

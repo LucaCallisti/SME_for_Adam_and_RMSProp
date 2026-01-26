@@ -5,6 +5,7 @@ import torch
 import QuadraticFunction.Function as Fun
 import Algorithms.Balistic_regime_RMSProp as BR_RMSPROP
 import Algorithms.Batch_eq_regime_RMSProp as BER_RMSPROP
+import Algorithms.Utils as Algo_utils
 import os
 import time
 import QuadraticFunction.utils as utils
@@ -213,7 +214,7 @@ def Simulation_sde(opt_discr, opt_cont_1, opt_cont_2, opt_cont_3 = None, A=None,
         regime = 'Unknown'
     Res['Regime'] = regime
 
-    regularizer = BR_RMSPROP.Regularizer_ReLu()
+    regularizer = Algo_utils.Regularizer_ReLu()
     start_tot = time.time()
     for i in [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]:
         if i> 4: max_batch_size = 600000

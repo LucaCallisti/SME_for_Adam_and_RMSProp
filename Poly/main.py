@@ -406,7 +406,7 @@ def run_experiment_configuration(
         beta = 1 - tau * args.c
         print(f"\n==================== tau = {tau}, C = {args.c}, BETA = {beta} Starting point {initial_points_before_disc} epsilon {epsilon} ====================\n")
 
-    result_dir = f"{args.results_dir}_tau_{tau}_c_{args.c}_finaltime_{final_time}_sigma_{sigma_value}"
+    result_dir = os.path.normpath(os.path.join(args.results_dir, f"tau_{tau}_c_{args.c}_finaltime_{final_time}_sigma_{sigma_value}"))
     result_dir = os.path.join(result_dir, args.regime.replace(' ', '_'))
     os.makedirs(result_dir, exist_ok=True)
     
@@ -494,6 +494,7 @@ def main():
     Main execution function for function approximation SDE/discrete experiments.
     """
     args = parse_arguments()
+    args.results_dir = os.path.join(args.results_dir, args.name_project)
     
     print("Starting Neural Network Training with RMSProp SDE Approximations")
     print(f"Regime: {args.regime}")
