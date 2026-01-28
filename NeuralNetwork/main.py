@@ -162,10 +162,6 @@ def run_sde_simulations(
         for t in range(num_steps):
             loss[run, : , t] = model.loss_batch(res_cont[:, t, :dim_weights])
 
-        if which_approximation == 'approx_2_fun':
-            torch.save(runs, f'/scratch/callisti/Code_2025-11-22/NeuralNetwork/debug_runs_2nd_order_{MODEL_NAME}.pt')
-            torch.save(loss, f'/scratch/callisti/Code_2025-11-22/NeuralNetwork/debug_loss_2nd_order_{MODEL_NAME}.pt')
-
     loss = loss.reshape(-1, loss.shape[2])
     res_loss = process_results(loss, checkpoints = checkpoint, variable='Loss', Norm_bool=False)
     res = res_loss
@@ -555,7 +551,6 @@ def run_experiment_configuration(
         )
         base_results['2_order_stoc'] = res_2_order
         base_results['simulation keys'] += ['2_order_stoc']
-        torch.save(base_results, f'/scratch/callisti/Code_2025-11-22/NeuralNetwork/debug_{MODEL_NAME}.pt')
         log_results_on_wandb(base_results, args, '2_order_stoc', tau, sigma_value, result_dir)
     
 
