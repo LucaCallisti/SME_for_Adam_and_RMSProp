@@ -11,6 +11,7 @@ import time
 import QuadraticFunction.utils as utils 
 
 sys.setrecursionlimit(10000)
+SIGMA_VALUE = 0.25
 
 
 def Dynamic_simulation(fun, eta, c, beta, skip_initial_point, step, y0, final_time, option, regularizer, Verbose = False, epsilon = 1e-3, dataset = None):
@@ -43,19 +44,19 @@ def Dynamic_simulation(fun, eta, c, beta, skip_initial_point, step, y0, final_ti
         return BER_Adam.Discrete_Adam_batch_equivalent_regime(fun, dataset, eta, beta, c, step, y0, skip = skip_initial_point, epsilon=epsilon, loss_bool = False)[:, skip_initial_point:, :]
     
     elif option == 'Adam_SDE_1order_balistic_regime':
-        sde = BR_Adam.Adam_SDE_1order_balistic_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = 1)
+        sde = BR_Adam.Adam_SDE_1order_balistic_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = SIGMA_VALUE)
         return torchsde.sdeint(sde, y0, ts, method = 'euler', dt = eta**2)
     elif option == 'Adam_Approx_1order_balistic_regime':
-        sde = BR_Adam.Adam_deterministic(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = 1)
+        sde = BR_Adam.Adam_deterministic(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = SIGMA_VALUE)
         return torchsde.sdeint(sde, y0, ts, method = 'euler', dt = eta**2)
     elif option == 'Adam_SDE_2order_balistic_regime':
-        sde = BR_Adam.Adam_SDE_2order_balistic_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = 1)
+        sde = BR_Adam.Adam_SDE_2order_balistic_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = SIGMA_VALUE)
         return torchsde.sdeint(sde, y0, ts, method = 'euler', dt = eta**2)
     elif option == 'Adam_SDE_1order_batch_equivalent_regime':
-        sde = BER_Adam.Adam_SDE_1order_batch_equivalent_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = 1)
+        sde = BER_Adam.Adam_SDE_1order_batch_equivalent_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = SIGMA_VALUE)
         return torchsde.sdeint(sde, y0, ts, method = 'euler', dt = eta**2)
     elif option == 'Adam_SDE_2order_batch_equivalent_regime':
-        sde = BER_Adam.Adam_SDE_2order_batch_equivalent_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = 1)
+        sde = BER_Adam.Adam_SDE_2order_batch_equivalent_regime(eta, c, fun, ts, regularizer, epsilon = epsilon, sigma_value = SIGMA_VALUE)
         return torchsde.sdeint(sde, y0, ts, method = 'euler', dt = eta**2)
     else:
         raise ValueError("Invalid option for simulation. Choose from 'Dyscrete_balistic_regime', 'Dyscrete_batch_equivalent_regime', 'RMSProp_SDE_1order_balistic_regime', 'RMSProp_SDE_2order_balistic_regime', 'RMSProp_SDE_1order_batch_equivalent_regime', 'RMSProp_SDE_2order_batch_equivalent_regime'.")
@@ -204,7 +205,7 @@ def Simulation_sde(opt_discr, opt_cont_1, opt_cont_2, opt_cont_3 = None, A=None,
     else:
         fun = Fun.Quadratic_function(dim=dim, A=A)
 
-    final_time = 40
+    final_time = 10
     max_batch_size = 1200000
     max_sim = 10**7-1
     data_theta_final, data_theta_max, data_m_final, data_m_max, data_v_final, data_v_max, Res = {}, {}, {}, {}, {}, {}, {}
@@ -225,9 +226,7 @@ def Simulation_sde(opt_discr, opt_cont_1, opt_cont_2, opt_cont_3 = None, A=None,
 
     regularizer = Algo_utils.Regularizer_ReLu()
     start_tot = time.time()
-    for i in [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]:
-        if i> 4: max_batch_size = 600000
-        if i> 4.5: max_batch_size = 300000
+    for i in [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3]:
         start = time.time()
         power = '2'
         eta = 2**(-i)
@@ -278,12 +277,12 @@ def Simulation_sde(opt_discr, opt_cont_1, opt_cont_2, opt_cont_3 = None, A=None,
         if path_folder_for_opt_3 is not None:
             torch.save(Res_opt_3, os.path.join(path_folder_for_opt_3, "Result_opt_3.pt"))
     
-    utils.Graph_with_right_constants(Res, 40, path_folder, data_theta_max, data_v_max, data_m_max, regime = regime)
+    utils.Graph_with_right_constants(Res, 10, path_folder, data_theta_max, data_v_max, data_m_max, regime = regime)
     if opt_cont_3 != None:
-        utils.Graph_with_right_constants(Res_opt_3, 40, path_folder_for_opt_3, data_theta_max_opt_3, data_v_max_opt_3, data_m_max_opt_3, regime = regime)
+        utils.Graph_with_right_constants(Res_opt_3, 10, path_folder_for_opt_3, data_theta_max_opt_3, data_v_max_opt_3, data_m_max_opt_3, regime = regime)
 
   
-def multiple_simulations(Main_folder=None, opt_discr=None, opt_cont_1=None, opt_cont_2=None, opt_cont_3 = None, folder_opt_3 = None, dataset=None, initial_point=[10., 5.], seed = 0):
+def multiple_simulations(Main_folder=None, opt_discr=None, opt_cont_1=None, opt_cont_2=None, opt_cont_3 = None, folder_opt_3 = None, dataset=None, initial_point=torch.tensor([10., 5.]), seed = 0):
     """
     Runs multiple sets of simulations for different fixed values of c and saves the results.
     Args:
@@ -300,6 +299,7 @@ def multiple_simulations(Main_folder=None, opt_discr=None, opt_cont_1=None, opt_
         None
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    initial_point = initial_point.to(device)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -331,7 +331,8 @@ def Adam_balistic_regime():
         None
     """
     Main_folder = './Results_QuadraticFunction'
-    dataset, init_point = Fun.create_dataset_and_initial_point(dim=2, num_samlpes=100*40*2**5)
+    dataset = Fun.create_dataset(dim=2, num_samlpes=100*40*2**5)
+    dataset = SIGMA_VALUE * dataset
     folder = os.path.join(Main_folder, 'Adam_balistic_regime_SDE1')
     if not os.path.exists(folder): os.makedirs(folder)
     opt_discr = 'Adam_dyscrete_balistic_regime'
@@ -341,7 +342,7 @@ def Adam_balistic_regime():
     folder_opt_3 = os.path.join(Main_folder, 'Adam_balistic_regime_approx1')
     if not os.path.exists(folder_opt_3): os.makedirs(folder_opt_3)
     print('\n \n Adam Balistic regime SDE1 \n')
-    multiple_simulations(folder, opt_discr, opt_cont_1, opt_cont_2, opt_cont_3=opt_cont_3, dataset = dataset, initial_point = init_point, folder_opt_3=folder_opt_3)
+    multiple_simulations(folder, opt_discr, opt_cont_1, opt_cont_2, opt_cont_3=opt_cont_3, dataset = dataset, folder_opt_3=folder_opt_3)
 
 def Adam_batch_equivalent_regime():
     """
@@ -350,14 +351,15 @@ def Adam_batch_equivalent_regime():
         None
     """
     Main_folder = './Results_QuadraticFunction'
-    dataset, init_point = Fun.create_dataset_and_initial_point(dim=2, num_samlpes=100*40*2**5)
+    dataset = Fun.create_dataset(dim=2, num_samlpes=100*40*2**5)
+    dataset = SIGMA_VALUE * dataset
     folder = os.path.join(Main_folder, 'Adam_batch_equivalent_regime_SDE1')
     if not os.path.exists(folder): os.makedirs(folder)
     opt_discr = 'Adam_dyscrete_batch_equivalent_regime'
     opt_cont_1 = 'Adam_SDE_1order_batch_equivalent_regime'
     opt_cont_2 = 'Adam_SDE_2order_batch_equivalent_regime'
     print('\n \n Adam batch equivalent regime SDE1 \n')
-    multiple_simulations(folder, opt_discr, opt_cont_1, opt_cont_2, dataset = dataset, initial_point = init_point)
+    multiple_simulations(folder, opt_discr, opt_cont_1, opt_cont_2, dataset = dataset)
 
 
 if __name__ == "__main__":

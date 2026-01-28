@@ -201,19 +201,18 @@ class Quadratic_function():
         """
         return torch.zeros_like(x)
 
-def create_dataset_and_initial_point(dim, num_samlpes, path=None):
+def create_dataset(dim, num_samlpes, path=None):
     """
-    Creates a dataset of random samples and an initial point for experiments.
+    Creates a dataset of random samples.
     Args:
         dim: Dimension of the data.
         num_samlpes: Number of samples to generate.
         path: Optional path to save the dataset.
     Returns:
-        Tuple of (dataset, initial_point).
+        Dataset tensor.
     """
     utils.set_seed(0)
-    initial_point = 10*torch.randn(dim)
     dataset = torch.randn(num_samlpes, dim)
     if path is not None:
-        torch.save({'dataset': dataset, 'initial_point': initial_point}, path)
-    return dataset, initial_point
+        torch.save({'dataset': dataset}, path)
+    return dataset
