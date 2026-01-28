@@ -6,7 +6,6 @@ from sklearn.datasets import fetch_california_housing, load_breast_cancer, fetch
 from sklearn.preprocessing import StandardScaler
 from torchvision import datasets
 from typing import Tuple, Dict, Any
-os.environ["WANDB_CACHE_DIR"] = "/scratch/callisti/wandb_cache"
 import wandb
 import math
 
