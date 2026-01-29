@@ -3,6 +3,7 @@ import random
 import numpy as np
 import torch
 from sklearn.datasets import fetch_california_housing, load_breast_cancer, fetch_openml
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from torchvision import datasets
 from typing import Tuple, Dict, Any
@@ -189,6 +190,10 @@ def load_and_preprocess_data(dataset) -> Tuple[torch.Tensor, torch.Tensor, torch
         data = fetch_openml('mnist_784', version=1, as_frame=False, parser='auto')
         X = data['data']
         y = data['target'].astype(int)
+    
+        _, X, _, y = train_test_split(
+            X, y, test_size=1/7, random_state=0, stratify=y
+        )
     elif dataset == 'CIFAR10':
         train_set = datasets.CIFAR10(root='./data', train=True, download=True)
         test_set = datasets.CIFAR10(root='./data', train=False, download=True)
