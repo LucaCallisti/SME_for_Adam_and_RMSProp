@@ -166,8 +166,8 @@ class RMSprop_SDE_1order_balistic_regime(RMSprop_SDE_2order_balistic_regime):
         v_reg = self.regularizer.regulariz_function(self.v)
         denom = 1/(torch.sqrt(v_reg) + self.eps)
         M_11 = torch.bmm(torch.diag_embed(denom), self.Sigma_sqrt)
-        M_21 = -2*self.c*torch.bmm(torch.diag_embed(self.f_grad), self.Sigma_sqrt)
-
+        
+        M_21 = torch.zeros_like(M_11)
         M_22 = torch.zeros_like(M_11)
         M_12 = torch.zeros_like(M_11)
 
